@@ -1,68 +1,105 @@
-:root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
-}
-
+/* === Global App Styling === */
 body {
-  margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
+  @apply bg-white text-black font-sans;
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+/* === Glass Card Style === */
+.card-glass {
+  @apply rounded-2xl bg-white bg-opacity-60 border border-gray-300 shadow-xl p-6 backdrop-blur-md;
 }
 
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+/* === Metallic Button Style === */
+.btn-metallic {
+  @apply bg-gradient-to-br from-gray-100 via-gray-300 to-white text-black font-bold rounded-xl px-5 py-2 shadow-md hover:shadow-lg hover:from-pink-100 hover:to-pink-300 transition duration-300;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
+/* === Clean Compact Button Style for Tables === */
+.btn-clean {
+  @apply px-3 py-1 text-xs font-semibold text-black bg-white border border-gray-300 rounded hover:bg-pink-100 hover:border-pink-400 transition whitespace-nowrap;
+}
+
+/* === Bubble Glow Container (Optional for login/cards) === */
+.bubble-glow {
+  @apply bg-white bg-opacity-70 rounded-xl border border-gray-300 shadow-xl p-6 backdrop-blur-md;
+  box-shadow: 0 0 12px rgba(255, 20, 147, 0.3); /* neon pink glow */
+}
+
+/* === Admin Dashboard Buttons === */
+.btn-dashboard {
+  @apply w-full sm:w-auto px-6 py-3 text-sm font-bold text-white rounded-xl bg-gradient-to-br from-pink-500 via-pink-400 to-pink-300 shadow-lg hover:shadow-xl transition;
+}
+
+/* === Input Fields === */
+.input-field {
+  @apply w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-400 focus:border-pink-400 transition;
+}
+
+/* === Responsive Table Styling === */
+.table-container {
+  @apply overflow-x-auto;
+}
+
+table {
+  @apply w-full border-collapse;
+}
+
+th {
+  @apply bg-pink-50 text-left text-xs font-semibold text-black uppercase tracking-wider px-3 py-2 border-b border-gray-300;
+}
+
+td {
+  @apply text-sm text-gray-800 px-3 py-2 border-b border-gray-200;
+}
+
+tr:hover {
+  @apply bg-pink-50;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  background-color: rgba(0, 0, 0, 0.5); /* semi-transparent dark backdrop */
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  backdrop-filter: blur(4px);
+}
+
+.modal-glass {
+  background-color: white;
+  padding: 2rem;
+  border-radius: 1rem;
+  box-shadow: 0 0 40px rgba(255, 105, 180, 0.5); /* neon pink glow */
+  width: 90%;
+  max-width: 700px;
+  max-height: 90vh;
+  overflow-y: auto;
+  z-index: 1000;
+}
+
+/* === Bubbly Pink Button Style === */
+.btn-bubbly {
+  background: linear-gradient(to bottom, #fce4ec, #f8bbd0);
+  border: none;
+  color: #c2185b;
+  padding: 0.5rem 1.25rem;
+  border-radius: 9999px; /* fully rounded = bubbly */
+  font-weight: 600;
+  box-shadow: 0 4px 10px rgba(252, 228, 236, 0.5);
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.btn-bubbly:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 14px rgba(248, 187, 208, 0.6);
+}
+
+.btn-bubbly:active {
+  transform: scale(0.96);
+  box-shadow: 0 2px 5px rgba(240, 98, 146, 0.3);
 }
