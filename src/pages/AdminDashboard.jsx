@@ -35,13 +35,6 @@ export default function AdminDashboard() {
         {/* Buttons */}
         <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
           <button
-            onClick={() => navigate('/portaloo-manager')}
-            className="btn-dashboard w-60 py-4 px-6 text-lg"
-          >
-            Portaloo Manager
-          </button>
-
-          <button
             onClick={() => navigate('/bookings')}
             className="btn-dashboard w-60 py-4 px-6 text-lg"
           >

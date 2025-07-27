@@ -22,6 +22,8 @@ export default function Bookings() {
   const [selectedJob, setSelectedJob] = useState(null)
   const [selectedWTN, setSelectedWTN] = useState(null)
   const [wtnPDFUrl, setWTNPDFUrl] = useState(null)
+  const [paidFilter, setPaidFilter] = useState('All')
+  const [paymentTypeFilter, setPaymentTypeFilter] = useState('All')
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -108,11 +110,20 @@ export default function Bookings() {
     navigate('/')
   }
 
-  const filteredJobs = jobs.filter((job) =>
-    Object.values(job).some((val) =>
-      String(val).toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredJobs = jobs
+    .filter((job) =>
+      Object.values(job).some((val) =>
+        String(val).toLowerCase().includes(searchTerm.toLowerCase())
+      )
     )
-  )
+    .filter((job) => {
+      if (paidFilter === 'All') return true
+      return paidFilter === 'Paid' ? job.paid === true : job.paid === false
+    })
+    .filter((job) => {
+      if (paymentTypeFilter === 'All') return true
+      return job.payment_type === paymentTypeFilter
+    })
 
   const filteredArchivedJobs = archivedJobs.filter((job) =>
     Object.values(job).some((val) =>
@@ -152,6 +163,29 @@ export default function Bookings() {
           onChange={(e) => setSearchTerm(e.target.value)}
           className="w-full p-3 rounded border focus:outline-none"
         />
+
+        <div className="flex gap-4 my-4">
+          <select
+            className="p-2 rounded border"
+            value={paidFilter}
+            onChange={(e) => setPaidFilter(e.target.value)}
+          >
+            <option value="All">All Jobs</option>
+            <option value="Paid">Paid</option>
+            <option value="Unpaid">Unpaid</option>
+          </select>
+
+          <select
+            className="p-2 rounded border"
+            value={paymentTypeFilter}
+            onChange={(e) => setPaymentTypeFilter(e.target.value)}
+          >
+            <option value="All">All Payment Types</option>
+            <option value="Cash">Cash</option>
+            <option value="Card">Card</option>
+            <option value="Invoice">Invoice</option>
+          </select>
+        </div>
 
         <div className="overflow-x-auto max-h-[500px] overflow-y-auto border rounded">
           <table className="min-w-full table-auto border-collapse">
