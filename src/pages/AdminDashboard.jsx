@@ -10,7 +10,7 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="bg-wrap bg-gradient-to-br from-white to-slate-100 min-h-screen px-6 py-10 relative">
+    <div className="bg-wrap bg-gradient-to-br from-white to-slate-100 min-h-screen px-6 py-10 pt-16 relative">
       {/* Log Out button (top-right corner) */}
       <button
         onClick={handleLogout}

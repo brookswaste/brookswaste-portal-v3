@@ -103,3 +103,12 @@ tr:hover {
   transform: scale(0.96);
   box-shadow: 0 2px 5px rgba(240, 98, 146, 0.3);
 }
+
+/* === Global Header with Logo === */
+.site-header {
+  @apply bg-white shadow-md sticky top-0 z-50 px-4 py-2 flex items-center justify-between;
+}
+
+.site-logo {
+  @apply h-10 w-auto;
+}

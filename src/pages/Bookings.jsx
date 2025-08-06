@@ -34,7 +34,10 @@ export default function Bookings() {
   }, [])
 
   const fetchJobs = async () => {
-    const { data, error } = await supabase.from('jobs').select('*')
+    const { data, error } = await supabase
+    .from('jobs')
+    .select('*')
+    .order('id', { ascending: true })
     if (!error) setJobs(data)
   }
 
@@ -132,7 +135,7 @@ export default function Bookings() {
   )
 
   return (
-    <div className="bg-gradient-to-br from-white to-slate-100 min-h-screen px-6 py-10 relative">
+    <div className="admin-page bg-gradient-to-br from-white to-slate-100 min-h-screen px-4 py-6 text-sm relative">
       <button
         onClick={handleLogout}
         className="btn-bubbly absolute top-4 right-6 text-sm px-4 py-2"
