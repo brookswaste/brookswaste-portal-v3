@@ -75,7 +75,7 @@ export function NewBookingModal({ onClose, onSave }) {
 
 
   const fields = [
-    { name: 'job_type', label: 'Job Type *' },
+    { name: 'job_type', label: 'Job Type *', type: 'jobTypeDropdown' },
     { name: 'customer_name', label: 'Customer Name *' },
     { name: 'company_name', label: 'Company Name' },
     { name: 'address_line_1', label: 'Address Line 1 *' },
@@ -129,6 +129,27 @@ export function NewBookingModal({ onClose, onSave }) {
                       {driver.name}
                     </option>
                   ))}
+                </select>
+              ) : type === 'jobTypeDropdown' ? (
+                <select
+                  name={name}
+                  value={formData[name] || ''}
+                  onChange={handleChange}
+                  className="w-full p-2 border rounded"
+                >
+                  <option value="">Select job type</option>
+                  <option value="Tanker">Tanker</option>
+                  <option value="Blockage">Blockage</option>
+                  <option value="CCTV">CCTV</option>
+                  <option value="Portaloo">Portaloo</option>
+                  <option value="Service">Service</option>
+                  <option value="Other">Other</option>
+                  <option value="CALL OUT Tanker">CALL OUT Tanker</option>
+                  <option value="CALL OUT Blockage">CALL OUT Blockage</option>
+                  <option value="CALL OUT CCTV">CALL OUT CCTV</option>
+                  <option value="CALL OUT Portaloo">CALL OUT Portaloo</option>
+                  <option value="CALL OUT Service">CALL OUT Service</option>
+                  <option value="CALL OUT Other">CALL OUT Other</option>
                 </select>
               ) : type === 'checkbox' ? (
                 <input
