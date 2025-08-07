@@ -48,7 +48,25 @@ export default function EditModal({ job, onClose, onSave }) {
   }
 
   const fields = [
-    { name: 'job_type', label: 'Job Type' },
+    {
+      name: 'job_type',
+      label: 'Job Type',
+      type: 'select',
+      options: [
+        'Tanker',
+        'Blockage',
+        'CCTV',
+        'Portaloo',
+        'Service',
+        'Other',
+        'CALL OUT Tanker',
+        'CALL OUT Blockage',
+        'CALL OUT CCTV',
+        'CALL OUT Portaloo',
+        'CALL OUT Service',
+        'CALL OUT Other',
+      ],
+    },
     { name: 'customer_name', label: 'Customer Name' },
     { name: 'company_name', label: 'Company Name' },
     { name: 'address_line_1', label: 'Address Line 1' },
@@ -64,11 +82,17 @@ export default function EditModal({ job, onClose, onSave }) {
     { name: 'on_site_contact_number', label: 'On-site Contact' },
     { name: 'delivery_instructions', label: 'Delivery Instructions' },
     { name: 'portaloo_numbers', label: 'Portaloo Numbers' },
+    { name: 'portaloo_colour', label: 'Portaloo Colour', type: 'select', options: ['Blue', 'Pink', 'Green'] },
     { name: 'waste_type', label: 'Waste Type' },
     { name: 'tank_size', label: 'Tank Size' },
     { name: 'waste_transfer_note_complete', label: 'WTN Complete', type: 'checkbox' },
     { name: 'job_complete', label: 'Job Complete', type: 'checkbox' },
-    { name: 'payment_type', label: 'Payment Type' },
+    {
+      name: 'payment_type',
+      label: 'Payment Type',
+      type: 'select',
+      options: ['Cash', 'Card', 'Invoice', 'TBD'],
+    },
     { name: 'paid', label: 'Paid', type: 'checkbox' },
   ]
 
@@ -96,6 +120,20 @@ export default function EditModal({ job, onClose, onSave }) {
                   onChange={handleChange}
                   className="ml-2"
                 />
+              ) : type === 'select' ? (
+                <select
+                  name={name}
+                  value={formData[name] || ''}
+                  onChange={handleChange}
+                  className="w-full p-2 border rounded"
+                >
+                  <option value="">Select</option>
+                  {fields.find(f => f.name === name)?.options.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
               ) : (
                 <input
                   type="text"
@@ -105,6 +143,7 @@ export default function EditModal({ job, onClose, onSave }) {
                   className="w-full p-2 border rounded"
                 />
               )}
+
             </div>
           ))}
         </div>

@@ -12,6 +12,7 @@ export default function DriverDashboard() {
   const [showArchived, setShowArchived] = useState(false)
   const [showCompleted, setShowCompleted] = useState(false)
   const [showWTNModalForJob, setShowWTNModalForJob] = useState(null)
+  const [selectedDate, setSelectedDate] = useState(null)
 
   const fetchDriverJobs = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -36,7 +37,7 @@ export default function DriverDashboard() {
       .select('*')
       .eq('driver_id', driver.id)
 
-    setJobs(activeJobs || [])
+    setJobs((activeJobs || []).sort((a, b) => (a.job_order || 999) - (b.job_order || 999)))
     setArchivedJobs(archived || [])
   }
 
@@ -97,14 +98,36 @@ export default function DriverDashboard() {
         {/* Current Jobs */}
         <div className="mb-8">
           <h2 className="text-lg font-semibold mb-3">🟢 Current Jobs</h2>
+          <div className="mb-4 flex items-center gap-2">
+            <label className="text-sm font-medium">Filter by Date of Service:</label>
+            <input
+              type="date"
+              className="border rounded px-2 py-1 text-sm"
+              value={selectedDate || ''}
+              onChange={(e) => setSelectedDate(e.target.value)}
+            />
+            {selectedDate && (
+              <button
+                onClick={() => setSelectedDate(null)}
+                className="text-xs text-blue-600 underline"
+              >
+                Clear
+              </button>
+            )}
+          </div>
           {jobs.filter(j => !j.job_complete).length === 0 ? (
             <p className="text-gray-500">No current jobs assigned.</p>
           ) : (
-            jobs.filter(j => !j.job_complete).map(job => (
+            jobs
+              .filter(j => !j.job_complete)
+              .filter(j => !selectedDate || j.date_of_service === selectedDate)
+              .map(job => (
               <div key={job.id} className="card-glass mb-4 p-4">
                 <div className="flex justify-between items-center">
                   <div>
-                    <p className="font-semibold">{job.job_type}</p>
+                    <p className="font-semibold">
+                      {job.job_order ? `#${job.job_order} – ` : ''}{job.job_type}
+                    </p>
                     <p className="text-sm text-gray-600">{job.post_code}</p>
                     <p className="text-sm text-gray-600">{job.mobile_number}</p>
                   </div>

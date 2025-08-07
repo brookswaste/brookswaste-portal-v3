@@ -92,11 +92,12 @@ export function NewBookingModal({ onClose, onSave }) {
     { name: 'on_site_contact_number', label: 'On-site Contact' },
     { name: 'delivery_instructions', label: 'Delivery Instructions' },
     { name: 'portaloo_numbers', label: 'Portaloo Numbers' },
+    { name: 'portaloo_colour', label: 'Portaloo Colour', type: 'dropdown-colour' },
     { name: 'waste_type', label: 'Waste Type' },
     { name: 'tank_size', label: 'Tank Size' },
     { name: 'waste_transfer_note_complete', label: 'WTN Complete', type: 'checkbox' },
     { name: 'job_complete', label: 'Job Complete', type: 'checkbox' },
-    { name: 'payment_type', label: 'Payment Type *' },
+    { name: 'payment_type', label: 'Payment Type *', type: 'dropdown-payment' },
     { name: 'paid', label: 'Paid', type: 'checkbox' },
   ]
 
@@ -150,6 +151,31 @@ export function NewBookingModal({ onClose, onSave }) {
                   <option value="CALL OUT Portaloo">CALL OUT Portaloo</option>
                   <option value="CALL OUT Service">CALL OUT Service</option>
                   <option value="CALL OUT Other">CALL OUT Other</option>
+                </select>
+              ) : type === 'dropdown-colour' ? (
+                <select
+                  name={name}
+                  value={formData[name] || ''}
+                  onChange={handleChange}
+                  className="w-full p-2 border rounded"
+                >
+                  <option value="">Select colour</option>
+                  <option value="Blue">Blue</option>
+                  <option value="Pink">Pink</option>
+                  <option value="Green">Green</option>
+                </select>
+              ) : type === 'dropdown-payment' ? (
+                <select
+                  name={name}
+                  value={formData[name] || ''}
+                  onChange={handleChange}
+                  className="w-full p-2 border rounded"
+                >
+                  <option value="">Select payment type</option>
+                  <option value="Cash">Cash</option>
+                  <option value="Card">Card</option>
+                  <option value="Invoice">Invoice</option>
+                  <option value="TBD">TBD</option>
                 </select>
               ) : type === 'checkbox' ? (
                 <input

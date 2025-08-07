@@ -24,6 +24,8 @@ export default function Bookings() {
   const [wtnPDFUrl, setWTNPDFUrl] = useState(null)
   const [paidFilter, setPaidFilter] = useState('All')
   const [paymentTypeFilter, setPaymentTypeFilter] = useState('All')
+  const [selectedDriverFilter, setSelectedDriverFilter] = useState('')
+  const [selectedDateFilter, setSelectedDateFilter] = useState('')
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -76,6 +78,25 @@ export default function Bookings() {
     if (!error) fetchJobs()
   }
 
+  const updateJobField = async (jobId, field, value) => {
+    const { error } = await supabase
+      .from('jobs')
+      .update({ [field]: value })
+      .eq('id', jobId)
+
+    if (!error) fetchJobs()
+  }
+
+
+  const updateJobOrder = async (jobId, order) => {
+    const { error } = await supabase
+      .from('jobs')
+      .update({ job_order: order })
+      .eq('id', jobId)
+
+    if (!error) fetchJobs()
+  }
+
   const handleNewWTN = async (job) => {
     const { data: existing, error } = await supabase
       .from('waste_transfer_notes')
@@ -95,11 +116,20 @@ export default function Bookings() {
 
   const handleArchive = async (job) => {
     const { id, ...jobData } = job
-    const { error } = await supabase.from('archived_jobs').insert([jobData])
+
+    // Force-include job_order in case it's undefined or missing
+    const fullJobData = {
+      ...jobData,
+      job_order: job.job_order || null // optional fallback
+    }
+
+    const { error } = await supabase.from('archived_jobs').insert([fullJobData])
     if (!error) {
       await supabase.from('jobs').delete().eq('id', id)
       fetchJobs()
       fetchArchivedJobs()
+    } else {
+      console.error('Archive error:', error)
     }
   }
 
@@ -126,6 +156,14 @@ export default function Bookings() {
     .filter((job) => {
       if (paymentTypeFilter === 'All') return true
       return job.payment_type === paymentTypeFilter
+    })
+    .filter((job) => {
+      if (!selectedDriverFilter) return true
+      return job.driver_id === selectedDriverFilter
+    })
+    .filter((job) => {
+      if (!selectedDateFilter) return true
+      return job.date_of_service === selectedDateFilter
     })
 
   const filteredArchivedJobs = archivedJobs.filter((job) =>
@@ -167,7 +205,9 @@ export default function Bookings() {
           className="w-full p-3 rounded border focus:outline-none"
         />
 
-        <div className="flex gap-4 my-4">
+        <div className="flex flex-wrap gap-4 my-4">
+
+          {/* Paid Filter */}
           <select
             className="p-2 rounded border"
             value={paidFilter}
@@ -178,6 +218,7 @@ export default function Bookings() {
             <option value="Unpaid">Unpaid</option>
           </select>
 
+          {/* Payment Type Filter */}
           <select
             className="p-2 rounded border"
             value={paymentTypeFilter}
@@ -188,7 +229,28 @@ export default function Bookings() {
             <option value="Card">Card</option>
             <option value="Invoice">Invoice</option>
           </select>
+
+          {/* Driver Filter */}
+          <select
+            className="p-2 rounded border"
+            value={selectedDriverFilter}
+            onChange={(e) => setSelectedDriverFilter(e.target.value)}
+          >
+            <option value="">All Drivers</option>
+            {drivers.map((driver) => (
+              <option key={driver.id} value={driver.id}>{driver.name}</option>
+            ))}
+          </select>
+
+          {/* Date Filter */}
+          <input
+            type="date"
+            className="p-2 rounded border"
+            value={selectedDateFilter}
+            onChange={(e) => setSelectedDateFilter(e.target.value)}
+          />
         </div>
+
 
         <div className="overflow-x-auto max-h-[500px] overflow-y-auto border rounded">
           <table className="min-w-full table-auto border-collapse">
@@ -199,9 +261,11 @@ export default function Bookings() {
                 <th className="border px-3 py-2">Postcode</th>
                 <th className="border px-3 py-2">Date of Service</th>
                 <th className="border px-3 py-2">Assigned Driver</th>
+                <th className="border px-3 py-2">Order</th>
                 <th className="border px-3 py-2">Job Complete</th>
-                <th className="border px-3 py-2">Payment Type</th>
                 <th className="border px-3 py-2">Paid</th>
+                <th className="border px-3 py-2">Invoice Required</th>
+                <th className="border px-3 py-2">Invoice Sent</th>
                 <th className="border px-3 py-2">Actions</th>
               </tr>
             </thead>
@@ -226,9 +290,68 @@ export default function Bookings() {
                       ))}
                     </select>
                   </td>
-                  <td className="border px-3 py-2">{job.job_complete ? 'Yes' : 'No'}</td>
-                  <td className="border px-3 py-2">{job.payment_type}</td>
-                  <td className="border px-3 py-2">{job.paid ? 'Yes' : 'No'}</td>
+                  <td className="border px-3 py-2">
+                    <select
+                      className="p-1 rounded border w-20"
+                      value={job.job_order || ''}
+                      onChange={(e) => updateJobOrder(job.id, Number(e.target.value))}
+                    >
+                      <option value="">-</option>
+                      {[...Array(20)].map((_, i) => (
+                        <option key={i + 1} value={i + 1}>
+                          {i + 1}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="border px-3 py-2">
+                    <select
+                      className="p-1 rounded border"
+                      value={job.job_complete ? 'Yes' : 'No'}
+                      onChange={(e) =>
+                        updateJobField(job.id, 'job_complete', e.target.value === 'Yes')
+                      }
+                    >
+                      <option value="Yes">Yes</option>
+                      <option value="No">No</option>
+                    </select>
+                  </td>
+                  <td className="border px-3 py-2">
+                    <select
+                      className="p-1 rounded border"
+                      value={job.paid ? 'Yes' : 'No'}
+                      onChange={(e) =>
+                        updateJobField(job.id, 'paid', e.target.value === 'Yes')
+                      }
+                    >
+                      <option value="Yes">Yes</option>
+                      <option value="No">No</option>
+                    </select>
+                  </td>
+                  <td className="border px-3 py-2">
+                    <select
+                      className="p-1 rounded border"
+                      value={job.invoice_required ? 'Yes' : 'No'}
+                      onChange={(e) =>
+                        updateJobField(job.id, 'invoice_required', e.target.value === 'Yes')
+                      }
+                    >
+                      <option value="Yes">Yes</option>
+                      <option value="No">No</option>
+                    </select>
+                  </td>
+                  <td className="border px-3 py-2">
+                    <select
+                      className="p-1 rounded border"
+                      value={job.invoice_sent ? 'Yes' : 'No'}
+                      onChange={(e) =>
+                        updateJobField(job.id, 'invoice_sent', e.target.value === 'Yes')
+                      }
+                    >
+                      <option value="Yes">Yes</option>
+                      <option value="No">No</option>
+                    </select>
+                  </td>
                   <td className="border px-3 py-2">
                     <div className="flex gap-2 flex-nowrap">
                       <button className="btn-bubbly text-xs px-3 py-1" onClick={() => handleEdit(job)}>Edit</button>

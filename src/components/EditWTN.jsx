@@ -94,96 +94,115 @@ export default function EditWTN({ wtn, onClose, onSubmit }) {
       format: 'a4'
     });
 
-    // Permanent Header
-    doc.setFillColor('#FFC0CB'); // Light pink background
-    doc.rect(0, 0, 210, 25, 'F');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(18);
-    doc.setTextColor('#000000');
-    doc.text('Brooks Waste – Sewage Specialist', 10, 15);
+    // Load and add Brooks Waste logo
+    const logoImg = new Image();
+    logoImg.src = '/images/brooks-logo.png';
+    logoImg.onload = () => {
+      doc.addImage(logoImg, 'PNG', 150, 10, 40, 0);
 
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.text('Kendale The Drive, Rayleigh Essex, SS6 8XQ', 10, 21);
-    doc.text('01268776126 · info@brookswaste.co.uk · www.brookswaste.co.uk', 10, 26);
-    doc.text('Waste Carriers Reg #: CBDU167551', 10, 31);
+      // Header
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(18);
+      doc.setTextColor('#000000');
+      doc.text('Brooks Waste – Sewage Specialist', 10, 15);
 
-    let y = 40;
-
-    const box = (label, value) => {
-      doc.setDrawColor(100);
-      doc.setLineWidth(0.2);
-      doc.rect(10, y, 190, 8);
       doc.setFontSize(10);
-      doc.text(`${label}: ${value ?? '-'}`, 12, y + 5);
-      y += 10;
+      doc.setFont('helvetica', 'normal');
+      doc.text('Kendale The Drive, Rayleigh Essex, SS6 8XQ', 10, 21);
+      doc.text('01268776126 · info@brookswaste.co.uk · www.brookswaste.co.uk', 10, 26);
+      doc.text('Waste Carriers Reg #: CBDU167551', 10, 31);
+
+      let y = 40;
+
+      const box = (label, value) => {
+        doc.setDrawColor(100);
+        doc.setLineWidth(0.2);
+        doc.rect(10, y, 190, 8);
+        doc.setFontSize(10);
+        doc.text(`${label}: ${value ?? '-'}`, 12, y + 5);
+        y += 10;
+      };
+
+      // New Fields
+      box('Job ID', formData.job_id);
+      box('Client Name', formData.client_name);
+      box('Client Telephone', formData.client_telephone);
+      box('Client Email', formData.client_email);
+      box('Client Address', formData.client_address);
+      box('Site Address', formData.site_address);
+      box('Vehicle Registration', formData.vehicle_registration);
+      box('Waste Containment', formData.waste_containment);
+      box('SIC Code', formData.sic_code);
+      box('EWC', formData.ewc);
+      box('Waste Description', formData.waste_description);
+      box('Carrier Reg. Number', formData.carrier_registration_number);
+      box('Amount Removed', formData.amount_removed);
+      box('Disposal Address', formData.disposal_address);
+      box('Job Description', formData.job_description);
+      box('Portaloo Drop-off Date', formData.portaloo_dropoff_date);
+      box('Portaloo Collection Date', formData.portaloo_collection_date);
+      box('Driver Name', formData.driver_name);
+      box('Customer Name', formData.customer_name);
+      
+      // Add padding to separate signatures from the last field box
+      y += 15;
+      
+      if (y > 250) y = 250;
+
+      const signatureHeight = 30;
+      const signatureWidth = 60;
+
+      // Signatures section
+      doc.setFontSize(10);
+      doc.text('Driver Signature:', 10, y);
+      doc.text('Customer Signature:', 110, y);
+
+      if (formData.operative_signature) {
+        doc.addImage(formData.operative_signature, 'PNG', 10, y + 5, signatureWidth, signatureHeight);
+      }
+
+      if (formData.customer_signature) {
+        doc.addImage(formData.customer_signature, 'PNG', 110, y + 5, signatureWidth, signatureHeight);
+      }
+
+      // Move down after signatures
+      y += signatureHeight + 15;
+
+      // Footer
+      doc.setTextColor('#000');
+      doc.setFontSize(7);
+      doc.text(
+        'You are signing to say you have read the above details and that they are correct and the operative has completed the job to a satisfactory standard. Brooks Waste ltd takes no responsibility for any damage done to your property where access is not suitable for a tanker. Please see our full terms and conditions on brookswaste.co.uk - Registered in England 06747484 Registered Office: 4 Chester Court, Chester Hall Lane Basildon, Essex SS14 3WR',
+        10,
+        282,
+        { maxWidth: 190 }
+      );
+
+      doc.save(`WTN_Job_${formData.job_id}.pdf`);
     };
-
-    box('Job ID', formData.job_id);
-    box('Description', formData.a1_description);
-    box('EWC Codes', Array.isArray(formData.a1_ewc_codes) ? formData.a1_ewc_codes.join(', ') : formData.a1_ewc_codes);
-    box('Containment', formData.a2_containment);
-    box('Quantity', formData.a3_quantity);
-    box('Producer Name', formData.b1_name);
-    box('Producer Company', formData.b1_company);
-    box('Producer Address', formData.b1_address);
-    box('Regulatory Authority', formData.b2_authority);
-    box('Carrier Role', Array.isArray(formData.b3_role) ? formData.b3_role.join(', ') : formData.b3_role);
-    box('Permit Number', formData.b3_permit_number);
-    box('Carrier Reg. Number', formData.b3_carrier_reg_number);
-    box('Receiver Name', formData.c1_name);
-    box('Receiver Company', formData.c1_company);
-    box('Receiver Address', formData.c1_address);
-    box('Transfer Address', formData.d1_address);
-    box('Date of Transfer', formData.d1_date);
-    box('Broker Name', formData.d_broker_name);
-    box('Broker Registration', formData.d_broker_registration);
-    box('Signed by Hierarchy', formData.d_sign_hierarchy ? 'Yes' : 'No');
-
-    // Signature
-    if (formData.signature) {
-      doc.text('Driver Signature:', 10, y + 5);
-      doc.addImage(formData.signature, 'PNG', 10, y + 10, 60, 30);
-      y += 45;
-    }
-
-    // Footer
-    doc.setFillColor('#FFC0CB');
-    doc.rect(0, 282, 210, 15, 'F');
-    doc.setTextColor('#000');
-    doc.setFontSize(7);
-    doc.text(
-      'You are signing to say you have read the above details and that they are correct and the operative has completed the job to a satisfactory standard. Brooks Waste ltd takes no responsibility for any damage done to your property where access is not suitable for a tanker. Please see our full terms and conditions on brookswaste.co.uk - Registered in England 06747484 Registered Office: 4 Chester Court, Chester Hall Lane Basildon, Essex SS14 3WR',
-      10,
-      287,
-      { maxWidth: 190 }
-    );
-
-    doc.save(`WTN_Job_${formData.job_id}.pdf`);
   };
 
   if (!formData) return null
 
   const fields = [
-    { name: 'a1_description', label: 'Description' },
-    { name: 'a1_ewc_codes', label: 'EWC Codes' },
-    { name: 'a2_containment', label: 'Containment' },
-    { name: 'a3_quantity', label: 'Quantity' },
-    { name: 'b1_name', label: 'Producer Name' },
-    { name: 'b1_company', label: 'Producer Company' },
-    { name: 'b1_address', label: 'Producer Address' },
-    { name: 'b2_authority', label: 'Regulatory Authority' },
-    { name: 'b3_role', label: 'Carrier Role' },
-    { name: 'b3_permit_number', label: 'Permit Number' },
-    { name: 'b3_carrier_reg_number', label: 'Carrier Reg. Number' },
-    { name: 'c1_name', label: 'Receiver Name' },
-    { name: 'c1_company', label: 'Receiver Company' },
-    { name: 'c1_address', label: 'Receiver Address' },
-    { name: 'd1_address', label: 'Transfer Address' },
-    { name: 'd1_date', label: 'Date of Transfer', type: 'date' },
-    { name: 'd_broker_name', label: 'Broker Name' },
-    { name: 'd_broker_registration', label: 'Broker Registration' },
-    { name: 'd_sign_hierarchy', label: 'Signed by Hierarchy?', type: 'checkbox' },
+    { name: 'client_name', label: 'Client Name' },
+    { name: 'client_telephone', label: 'Client Telephone' },
+    { name: 'client_email', label: 'Client Email' },
+    { name: 'client_address', label: 'Client Address' },
+    { name: 'site_address', label: 'Site Address' },
+    { name: 'vehicle_registration', label: 'Vehicle Registration' },
+    { name: 'waste_containment', label: 'Waste Containment' },
+    { name: 'sic_code', label: 'SIC Code' },
+    { name: 'ewc', label: 'EWC' },
+    { name: 'waste_description', label: 'Waste Description' },
+    { name: 'carrier_registration_number', label: 'Carrier Reg. Number' },
+    { name: 'amount_removed', label: 'Amount Removed' },
+    { name: 'disposal_address', label: 'Disposal Address' },
+    { name: 'job_description', label: 'Job Description' },
+    { name: 'portaloo_dropoff_date', label: 'Portaloo Drop-off Date', type: 'date' },
+    { name: 'portaloo_collection_date', label: 'Portaloo Collection Date', type: 'date' },
+    { name: 'driver_name', label: 'Driver Name' },
+    { name: 'customer_name', label: 'Customer Name' }
   ]
 
   return (
@@ -216,17 +235,24 @@ export default function EditWTN({ wtn, onClose, onSubmit }) {
           ))}
         </div>
 
-        <div className="mt-6">
-          <h3 className="text-sm font-semibold mb-1">Driver Signature</h3>
-          {formData.signature ? (
-            <img src={formData.signature} alt="Signature" className="border rounded w-64" />
-          ) : (
-            <SignatureCanvas
-              ref={sigCanvas}
-              penColor="black"
-              canvasProps={{ width: 400, height: 150, className: 'border rounded' }}
-            />
-          )}
+        <div className="mt-6 grid grid-cols-2 gap-4">
+          <div>
+            <h3 className="text-sm font-semibold mb-1">Driver Signature</h3>
+            {formData.operative_signature ? (
+              <img src={formData.operative_signature} alt="Driver Signature" className="border rounded w-64" />
+            ) : (
+              <p className="text-xs text-gray-500">No signature uploaded.</p>
+            )}
+          </div>
+
+          <div>
+            <h3 className="text-sm font-semibold mb-1">Customer Signature</h3>
+            {formData.customer_signature ? (
+              <img src={formData.customer_signature} alt="Customer Signature" className="border rounded w-64" />
+            ) : (
+              <p className="text-xs text-gray-500">No signature uploaded.</p>
+            )}
+          </div>
         </div>
 
         <div className="flex justify-end gap-2 mt-6">
