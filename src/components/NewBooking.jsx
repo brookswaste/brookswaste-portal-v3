@@ -13,6 +13,7 @@ export function NewBookingModal({ onClose, onSave }) {
     post_code: '',
     telephone_number: '',
     mobile_number: '',
+    email: '',
     date_of_service: '',
     driver_id: '',
     invoice_address: '',
@@ -85,6 +86,7 @@ export function NewBookingModal({ onClose, onSave }) {
     { name: 'post_code', label: 'Postcode *' },
     { name: 'telephone_number', label: 'Telephone' },
     { name: 'mobile_number', label: 'Mobile' },
+    { name: 'email', label: 'Email', type: 'email' },
     { name: 'date_of_service', label: 'Date of Service *', type: 'date' },
     { name: 'driver_id', label: 'Assigned Driver *', type: 'dropdown' },
     { name: 'invoice_address', label: 'Invoice Address' },
@@ -95,9 +97,9 @@ export function NewBookingModal({ onClose, onSave }) {
     { name: 'portaloo_colour', label: 'Portaloo Colour', type: 'dropdown-colour' },
     { name: 'waste_type', label: 'Waste Type' },
     { name: 'tank_size', label: 'Tank Size' },
+    { name: 'payment_type', label: 'Payment Type *', type: 'dropdown-payment' },
     { name: 'waste_transfer_note_complete', label: 'WTN Complete', type: 'checkbox' },
     { name: 'job_complete', label: 'Job Complete', type: 'checkbox' },
-    { name: 'payment_type', label: 'Payment Type *', type: 'dropdown-payment' },
     { name: 'paid', label: 'Paid', type: 'checkbox' },
   ]
 

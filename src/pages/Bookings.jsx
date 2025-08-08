@@ -165,6 +165,12 @@ export default function Bookings() {
       if (!selectedDateFilter) return true
       return job.date_of_service === selectedDateFilter
     })
+    .sort((a, b) => {
+      const driverA = getDriverName(a.driver_id).toLowerCase()
+      const driverB = getDriverName(b.driver_id).toLowerCase()
+      return driverA.localeCompare(driverB)
+    })
+
 
   const filteredArchivedJobs = archivedJobs.filter((job) =>
     Object.values(job).some((val) =>

@@ -76,6 +76,7 @@ export default function EditModal({ job, onClose, onSave }) {
     { name: 'post_code', label: 'Postcode' },
     { name: 'telephone_number', label: 'Telephone' },
     { name: 'mobile_number', label: 'Mobile' },
+    { name: 'email', label: 'Email' },
     { name: 'date_of_service', label: 'Date of Service', type: 'date' },
     { name: 'invoice_address', label: 'Invoice Address' },
     { name: 'date_of_collection', label: 'Date of Collection', type: 'date' },
@@ -85,14 +86,14 @@ export default function EditModal({ job, onClose, onSave }) {
     { name: 'portaloo_colour', label: 'Portaloo Colour', type: 'select', options: ['Blue', 'Pink', 'Green'] },
     { name: 'waste_type', label: 'Waste Type' },
     { name: 'tank_size', label: 'Tank Size' },
-    { name: 'waste_transfer_note_complete', label: 'WTN Complete', type: 'checkbox' },
-    { name: 'job_complete', label: 'Job Complete', type: 'checkbox' },
     {
       name: 'payment_type',
       label: 'Payment Type',
       type: 'select',
       options: ['Cash', 'Card', 'Invoice', 'TBD'],
     },
+    { name: 'waste_transfer_note_complete', label: 'WTN Complete', type: 'checkbox' },
+    { name: 'job_complete', label: 'Job Complete', type: 'checkbox' },
     { name: 'paid', label: 'Paid', type: 'checkbox' },
   ]
 
