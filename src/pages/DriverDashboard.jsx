@@ -14,6 +14,8 @@ export default function DriverDashboard() {
   const [showWTNModalForJob, setShowWTNModalForJob] = useState(null)
   const [selectedDate, setSelectedDate] = useState(null)
 
+  const [acceptedWarning, setAcceptedWarning] = useState(false)
+
   const fetchDriverJobs = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
@@ -78,6 +80,41 @@ export default function DriverDashboard() {
     return '–'
   }
 
+  // Safety popup — block dashboard until confirmed
+  if (!acceptedWarning) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+        <div className="bg-white max-w-lg w-full rounded-lg shadow-lg p-6 text-black">
+          <h2 className="text-xl font-bold mb-4">🚨 Important</h2>
+          <p className="mb-3">
+            It is a violation of Brooks Waste policy and UK road safety regulations to interact with this system while operating a vehicle.
+            Drivers must bring the vehicle to a complete stop in a safe location before using any features of this system.
+          </p>
+          <p className="mb-3">
+            <strong>By continuing, you confirm that:</strong>
+          </p>
+          <ul className="list-disc ml-6 mb-3">
+            <li>The vehicle is safely parked.</li>
+            <li>You are not in control of a moving vehicle.</li>
+            <li>You accept full responsibility for complying with road safety laws.</li>
+          </ul>
+          <p className="mb-3">
+            Failure to comply may result in disciplinary action.
+          </p>
+          <p className="mb-6">
+            Click <strong>“Confirm”</strong> only if you are fully stationary.
+          </p>
+          <button
+            onClick={() => setAcceptedWarning(true)}
+            className="btn-bubbly px-6 py-2"
+          >
+            Confirm
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="bg-wrap bg-gradient-to-br from-white to-slate-100 min-h-screen px-4 py-6 relative">
       <button onClick={handleLogout} className="btn-bubbly absolute top-4 right-6 text-sm px-4 py-2">
@@ -138,6 +175,27 @@ export default function DriverDashboard() {
 
                 {expandedJobId === job.id && (
                   <div className="text-sm text-gray-700 mt-4 space-y-1">
+
+                    {/* Editable Invoice Required Dropdown */}
+                    <div className="mb-2">
+                      <label className="block text-sm text-gray-600 font-medium mb-1">Invoice Required:</label>
+                      <select
+                        value={job.invoice_required ? 'yes' : 'no'}
+                        onChange={async (e) => {
+                          const newVal = e.target.value === 'yes'
+                          await supabase
+                            .from('jobs')
+                            .update({ invoice_required: newVal })
+                            .eq('id', job.id)
+                          fetchDriverJobs()
+                        }}
+                        className="w-full p-2 border rounded"
+                      >
+                        <option value="yes">Yes</option>
+                        <option value="no">No</option>
+                      </select>
+                    </div>
+
                     {Object.entries(job).map(([key, value]) => {
                       if (key === 'created_at' || key === 'driver_id') return null
                       return (
