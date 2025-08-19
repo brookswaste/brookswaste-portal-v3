@@ -4,6 +4,44 @@ import { supabase } from '../supabaseClient'
 import { v4 as uuidv4 } from 'uuid'
 import { useEffect } from 'react' // Make sure this is at the top
 
+const EWC_OPTIONS = [
+  '13 05 – Oil/Water Separator Contents',
+  '13 05 01* - Solids from Grit Chambers and Oil/Water Separators',
+  '13 05 02* - Sludges from Oil/Water Separators',
+  '13 05 03* - Interceptor Sludges',
+  '13 05 06* - Oil from Oil/Water Separators',
+  '13 05 07* - Oily Water from Oil/Water Separators',
+  '13 05 08* - Mixtures of Waste from Grit Chambers and Oil/Water Separators',
+  '16 03 – Off-Specification Batches and Unused Products',
+  '16 03 03* - Inorganic Wastes Containing Hazardous Substances',
+  '16 03 04 - Inorganic Wastes Other Than Those Mentioned in 16 03 03',
+  '16 03 05* - Organic Wastes Containing Hazardous Substances',
+  '16 03 06 – Organic Wastes Other Than Those Mentioned in 16 03 05',
+  '16 10 – Aqueous Liquid Waste Destined for Off-Site Treatment',
+  '16 10 01* - Aqueous Liquid Waste Containing Hazardous Substances',
+  '16 10 02 - Aqueous Liquid Wastes Other Than Those Mentioned in 16 10 01',
+  '16 10 03* - Aqueous Concentrates Containing Hazardous Substances',
+  '16 10 04 - Aqueous Concentrates Other Than Those Mentioned In 16 10 03',
+  '19 07 – Land Fill Leachate',
+  '19 07 02* - Landfill Leachate Containing Hazardous Substances',
+  '19 07 03 - Landfill Leachate Other Than Those Mentioned in 19 07 02',
+  '19 08 – Waste from Waste Water Treatment Plant Not Otherwise Specified',
+  '19 08 09 - Grease and Oil Mixture from Oil/Water Separation Containing Edible Oil and Fats',
+  '19 08 10* - Grease and Oil Mixture from Oil/Water Separation Other Than Those Mentioned in 19 08 09',
+  '19 12 – Waste from the Mechanical Treatment of Waste (E.g Sorting, Crushing, Compacting)',
+  '19 12 11* - Other Wastes (Including Mixtures of Materials) from Mechanical Treatment of Waste Containing Hazardous Substances',
+  '19 12 12 - Other Wastes (Including Mixtures of Materials) from Mechanical Treatment of Waste Other Than',
+  '20 01 – Separately Collected Fractions (Except 15 01)',
+  '20 01 25 - Edible Oil and Fat',
+  '20 01 26* - Oil and Fat Other Than Those Mentioned in 20 01 25',
+  '20 03 – Other Municipal Wastes',
+  '20 03 03 - Street Cleaning Residues (Gully Waste)',
+  '20 03 04 - Septic Tank Sludge',
+  '20 03 06 - Waste from Sewage Cleaning',
+  '20 03 99 - Municipal Waste Not Otherwise Specified'
+];
+
+
 export default function NewWTN({ jobId, onClose, onSubmit }) {
   const [formData, setFormData] = useState({
     job_id: jobId,
@@ -17,12 +55,13 @@ export default function NewWTN({ jobId, onClose, onSubmit }) {
     sic_code: '',
     ewc: '',
     waste_description: '',
-    carrier_registration_number: '',
     amount_removed: '',
     disposal_address: '',
     job_description: '',
     portaloo_dropoff_date: '',
     portaloo_collection_date: '',
+    time_in: '',
+    time_out: '',
     operative_signature: '',
     driver_name: '',
     customer_signature: '',
@@ -129,6 +168,12 @@ export default function NewWTN({ jobId, onClose, onSubmit }) {
   const handleSubmit = async () => {
     setLoading(true)
     const payload = { ...formData }
+    if (!payload.ewc) {
+      alert('Please select an EWC code.');
+      setLoading(false);
+      return;
+    }
+
 
     // Fetch user
     const {
@@ -193,12 +238,13 @@ export default function NewWTN({ jobId, onClose, onSubmit }) {
     { name: 'sic_code', label: 'SIC Code' },
     { name: 'ewc', label: 'EWC' },
     { name: 'waste_description', label: 'Waste Being Transferred' },
-    { name: 'carrier_registration_number', label: 'Carrier Reg. Number' },
     { name: 'amount_removed', label: 'Amount of Waste Removed' },
     { name: 'disposal_address', label: 'Disposal Address' },
     { name: 'job_description', label: 'Job Description' },
     { name: 'portaloo_dropoff_date', label: 'Portaloo Dropoff Date', type: 'date' },
     { name: 'portaloo_collection_date', label: 'Portaloo Collection Date', type: 'date' },
+    { name: 'time_in', label: 'Time In', type: 'time' },
+    { name: 'time_out', label: 'Time Out', type: 'time' },
     { name: 'driver_name', label: 'Driver Name' },
     { name: 'customer_name', label: 'Customer Name' },
   ]
@@ -212,13 +258,29 @@ export default function NewWTN({ jobId, onClose, onSubmit }) {
           {fields.map(({ name, label, type }) => (
             <div key={name}>
               <label className="text-xs text-gray-600">{label}</label>
-              <input
-                type={type || 'text'}
-                name={name}
-                value={formData[name] || ''}
-                onChange={handleChange}
-                className="w-full p-2 border rounded"
-              />
+
+              {name === 'ewc' ? (
+                <select
+                  name="ewc"
+                  value={formData.ewc || ''}
+                  onChange={handleChange}
+                  required
+                  className="w-full p-2 border rounded"
+                >
+                  <option value="">Select EWC code…</option>
+                  {EWC_OPTIONS.map(opt => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type={type || 'text'}
+                  name={name}
+                  value={formData[name] || ''}
+                  onChange={handleChange}
+                  className="w-full p-2 border rounded"
+                />
+              )}
             </div>
           ))}
         </div>

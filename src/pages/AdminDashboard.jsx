@@ -40,6 +40,13 @@ export default function AdminDashboard() {
           >
             Bookings
           </button>
+
+          <button
+            onClick={() => navigate('/todo')}
+            className="btn-dashboard w-60 py-4 px-6 text-lg"
+          >
+            To-Do List
+          </button>
         </div>
       </div>
     </div>

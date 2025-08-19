@@ -8,9 +8,7 @@ export default function DriverDashboard() {
   const navigate = useNavigate()
   const [name, setName] = useState('')
   const [jobs, setJobs] = useState([])
-  const [archivedJobs, setArchivedJobs] = useState([])
   const [expandedJobId, setExpandedJobId] = useState(null)
-  const [showArchived, setShowArchived] = useState(false)
   const [showCompleted, setShowCompleted] = useState(false)
   const [showWTNModalForJob, setShowWTNModalForJob] = useState(null)
   const [acceptedWarning, setAcceptedWarning] = useState(false)
@@ -38,14 +36,7 @@ export default function DriverDashboard() {
       .eq('driver_id', driver.id)
       .eq('date_of_service', todayStr)
 
-    // Archived jobs (all for this driver)
-    const { data: archived } = await supabase
-      .from('archived_jobs')
-      .select('*')
-      .eq('driver_id', driver.id)
-
     setJobs((activeJobs || []).sort((a, b) => (a.job_order || 999) - (b.job_order || 999)))
-    setArchivedJobs(archived || [])
   }
 
   useEffect(() => {
@@ -154,7 +145,6 @@ export default function DriverDashboard() {
     box('SIC Code', wtn.sic_code)
     box('EWC', wtn.ewc)
     box('Waste Description', wtn.waste_description)
-    box('Carrier Reg. Number', wtn.carrier_registration_number)
     box('Amount Removed', wtn.amount_removed)
     box('Disposal Address', wtn.disposal_address)
     box('Job Description', wtn.job_description)
@@ -410,41 +400,6 @@ export default function DriverDashboard() {
                 </div>
               ))
             )
-          )}
-        </div>
-
-        {/* Archived Jobs */}
-        <div className="mb-8">
-          <h2
-            className="text-lg font-semibold mb-3 cursor-pointer underline"
-            onClick={() => setShowArchived(!showArchived)}
-          >
-            📦 Archived Jobs {showArchived ? '▲' : '▼'}
-          </h2>
-
-          {showArchived && (
-            <div className="overflow-x-auto">
-              <table className="min-w-full table-auto text-sm text-left text-gray-700 bg-white rounded-md">
-                <thead className="bg-gray-100 text-xs uppercase text-gray-500">
-                  <tr>
-                    <th className="px-4 py-2">Job Type</th>
-                    <th className="px-4 py-2">Customer</th>
-                    <th className="px-4 py-2">Post Code</th>
-                    <th className="px-4 py-2">Date</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {archivedJobs.map(job => (
-                    <tr key={job.id} className="border-b">
-                      <td className="px-4 py-2">{job.job_type}</td>
-                      <td className="px-4 py-2">{job.customer_name}</td>
-                      <td className="px-4 py-2">{job.post_code}</td>
-                      <td className="px-4 py-2">{job.date_of_service}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
           )}
         </div>
       </div>

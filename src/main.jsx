@@ -8,7 +8,8 @@ import AdminDashboard from './pages/AdminDashboard.jsx'
 import PortalooManager from './pages/PortalooManager.jsx'
 import Bookings from './pages/Bookings.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
-import Layout from './components/Layout.jsx' // 🔥 add this
+import Layout from './components/Layout.jsx'
+import Todo from './pages/Todo.jsx'
 import './index.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
@@ -52,6 +53,14 @@ ReactDOM.createRoot(document.getElementById('root')).render(
             element={
               <ProtectedRoute adminOnly={true}>
                 <Bookings />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/todo"
+            element={
+              <ProtectedRoute adminOnly={true}>
+                <Todo />
               </ProtectedRoute>
             }
           />
