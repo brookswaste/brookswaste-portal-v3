@@ -2,14 +2,13 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import NewWTN from '../components/NewWTN'
+import jsPDF from 'jspdf'
 
 export default function DriverDashboard() {
   const navigate = useNavigate()
   const [name, setName] = useState('')
   const [jobs, setJobs] = useState([])
-  const [archivedJobs, setArchivedJobs] = useState([])
   const [expandedJobId, setExpandedJobId] = useState(null)
-  const [showArchived, setShowArchived] = useState(false)
   const [showCompleted, setShowCompleted] = useState(false)
   const [showWTNModalForJob, setShowWTNModalForJob] = useState(null)
   const [acceptedWarning, setAcceptedWarning] = useState(false)
@@ -36,15 +35,6 @@ export default function DriverDashboard() {
       .select('*')
       .eq('driver_id', driver.id)
       .eq('date_of_service', todayStr)
-
-    // Archived jobs (all for this driver)
-    const { data: archived } = await supabase
-      .from('archived_jobs')
-      .select('*')
-      .eq('driver_id', driver.id)
-
-    setJobs((activeJobs || []).sort((a, b) => (a.job_order || 999) - (b.job_order || 999)))
-    setArchivedJobs(archived || [])
   }
 
   useEffect(() => {
@@ -83,6 +73,120 @@ export default function DriverDashboard() {
     if (val === false) return '❌'
     return '–'
   }
+
+  // ▼ Add directly under renderBoolIcon
+  const handleDownloadWTN = async (jobId) => {
+    // 1) Get the latest WTN for this job
+    const { data: wtn, error } = await supabase
+      .from('waste_transfer_notes')
+      .select('*')
+      .eq('job_id', jobId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (error || !wtn) {
+      alert('No WTN found for this job.')
+      return
+    }
+
+    // 2) Helper to load images (logo & signatures)
+    const loadImage = (src) =>
+      new Promise((resolve, reject) => {
+        if (!src) return resolve(null)
+        const img = new Image()
+        img.crossOrigin = 'anonymous'
+        img.onload = () => resolve(img)
+        img.onerror = reject
+        img.src = src
+      })
+
+    // 3) Build PDF (mirrors EditWTN)
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+
+    try {
+      const logoImg = await loadImage('/images/brooks-logo.png')
+      if (logoImg) doc.addImage(logoImg, 'PNG', 150, 10, 40, 0)
+    } catch (_) {}
+
+    // Header
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(18)
+    doc.setTextColor('#000000')
+    doc.text('Brooks Waste – Sewage Specialist', 10, 15)
+
+    doc.setFontSize(10)
+    doc.setFont('helvetica', 'normal')
+    doc.text('Kendale The Drive, Rayleigh Essex, SS6 8XQ', 10, 21)
+    doc.text('01268776126 · info@brookswaste.co.uk · www.brookswaste.co.uk', 10, 26)
+    doc.text('Waste Carriers Reg #: CBDU167551', 10, 31)
+
+    let y = 40
+    const box = (label, value) => {
+      doc.setDrawColor(100)
+      doc.setLineWidth(0.2)
+      doc.rect(10, y, 190, 8)
+      doc.setFontSize(10)
+      doc.text(`${label}: ${value ?? '-'}`, 12, y + 5)
+      y += 10
+    }
+
+    // Same fields as EditWTN
+    box('Job ID', wtn.job_id)
+    box('Client Name', wtn.client_name)
+    box('Client Telephone', wtn.client_telephone)
+    box('Client Email', wtn.client_email)
+    box('Client Address', wtn.client_address)
+    box('Site Address', wtn.site_address)
+    box('Vehicle Registration', wtn.vehicle_registration)
+    box('Waste Containment', wtn.waste_containment)
+    box('SIC Code', wtn.sic_code)
+    box('EWC', wtn.ewc)
+    box('Waste Description', wtn.waste_description)
+    box('Carrier Reg. Number', wtn.carrier_registration_number)
+    box('Amount Removed', wtn.amount_removed)
+    box('Disposal Address', wtn.disposal_address)
+    box('Job Description', wtn.job_description)
+    box('Portaloo Drop-off Date', wtn.portaloo_dropoff_date)
+    box('Portaloo Collection Date', wtn.portaloo_collection_date)
+    box('Driver Name', wtn.driver_name)
+    box('Customer Name', wtn.customer_name)
+
+    // Signatures
+    y += 15
+    if (y > 250) y = 250
+
+    const signatureHeight = 30
+    const signatureWidth = 60
+
+    doc.setFontSize(10)
+    doc.text('Driver Signature:', 10, y)
+    doc.text('Customer Signature:', 110, y)
+
+    try {
+      const opSig = await loadImage(wtn.operative_signature)
+      if (opSig) doc.addImage(opSig, 'PNG', 10, y + 5, signatureWidth, signatureHeight)
+    } catch (_) {}
+
+    try {
+      const custSig = await loadImage(wtn.customer_signature)
+      if (custSig) doc.addImage(custSig, 'PNG', 110, y + 5, signatureWidth, signatureHeight)
+    } catch (_) {}
+
+    y += signatureHeight + 15
+
+    // Footer
+    doc.setTextColor('#000')
+    doc.setFontSize(7)
+    doc.text(
+      'You are signing to say you have read the above details and that they are correct and the operative has completed the job to a satisfactory standard. Brooks Waste ltd takes no responsibility for any damage done to your property where access is not suitable for a tanker. Please see our full terms and conditions on brookswaste.co.uk - Registered in England 06747484 Registered Office: 4 Chester Court, Chester Hall Lane Basildon, Essex SS14 3WR',
+      10,
+      282,
+      { maxWidth: 190 }
+    )
+
+    doc.save(`WTN_Job_${wtn.job_id}.pdf`)
+  } // ← closes handleDownloadWTN
 
   // Safety popup — block dashboard until confirmed
   if (!acceptedWarning) {
@@ -283,6 +387,12 @@ export default function DriverDashboard() {
                             : String(value)}
                         </p>
                       ))}
+                      <button
+                        className="btn-bubbly text-xs bg-blue-600 hover:bg-blue-700 mt-2"
+                        onClick={() => handleDownloadWTN(job.id)}
+                      >
+                        View / Download WTN PDF
+                      </button>
                     </div>
                   )}
                 </div>
@@ -290,42 +400,6 @@ export default function DriverDashboard() {
             )
           )}
         </div>
-
-        {/* Archived Jobs */}
-        <div className="mb-8">
-          <h2
-            className="text-lg font-semibold mb-3 cursor-pointer underline"
-            onClick={() => setShowArchived(!showArchived)}
-          >
-            📦 Archived Jobs {showArchived ? '▲' : '▼'}
-          </h2>
-
-          {showArchived && (
-            <div className="overflow-x-auto">
-              <table className="min-w-full table-auto text-sm text-left text-gray-700 bg-white rounded-md">
-                <thead className="bg-gray-100 text-xs uppercase text-gray-500">
-                  <tr>
-                    <th className="px-4 py-2">Job Type</th>
-                    <th className="px-4 py-2">Customer</th>
-                    <th className="px-4 py-2">Post Code</th>
-                    <th className="px-4 py-2">Date</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {archivedJobs.map(job => (
-                    <tr key={job.id} className="border-b">
-                      <td className="px-4 py-2">{job.job_type}</td>
-                      <td className="px-4 py-2">{job.customer_name}</td>
-                      <td className="px-4 py-2">{job.post_code}</td>
-                      <td className="px-4 py-2">{job.date_of_service}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </div>
 
       {showWTNModalForJob && (
         <NewWTN
