@@ -79,6 +79,8 @@ export default function EditModal({ job, onClose, onSave }) {
     { name: 'email', label: 'Email' },
     { name: 'date_of_service', label: 'Date of Service', type: 'date' },
     { name: 'invoice_address', label: 'Invoice Address' },
+    { name: 'job_cost_ex_vat', label: 'Job Cost ex VAT', type: 'number' },
+    { name: 'job_cost_inc_vat', label: 'Job Cost inc VAT', type: 'number' },
     { name: 'date_of_collection', label: 'Date of Collection', type: 'date' },
     { name: 'on_site_contact_number', label: 'On-site Contact' },
     { name: 'delivery_instructions', label: 'Delivery Instructions' },
@@ -90,11 +92,12 @@ export default function EditModal({ job, onClose, onSave }) {
       name: 'payment_type',
       label: 'Payment Type',
       type: 'select',
-      options: ['Cash', 'Card', 'Invoice', 'TBD'],
+      options: ['Cash', 'Card', 'Invoice', 'Cheque', 'BACS', 'SumUp', 'TBD'],
     },
     { name: 'waste_transfer_note_complete', label: 'WTN Complete', type: 'checkbox' },
     { name: 'job_complete', label: 'Job Complete', type: 'checkbox' },
     { name: 'paid', label: 'Paid', type: 'checkbox' },
+    { name: 'job_notes', label: 'Job Notes', type: 'textarea' },
   ]
 
   return (
@@ -135,6 +138,13 @@ export default function EditModal({ job, onClose, onSave }) {
                     </option>
                   ))}
                 </select>
+              ) : type === 'textarea' ? (
+                <textarea
+                  name={name}
+                  value={formData[name] || ''}
+                  onChange={handleChange}
+                  className="w-full p-2 border rounded min-h-[100px]"
+                />
               ) : (
                 <input
                   type="text"
@@ -144,7 +154,6 @@ export default function EditModal({ job, onClose, onSave }) {
                   className="w-full p-2 border rounded"
                 />
               )}
-
             </div>
           ))}
         </div>

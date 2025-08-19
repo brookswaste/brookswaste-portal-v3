@@ -17,6 +17,8 @@ export function NewBookingModal({ onClose, onSave }) {
     date_of_service: '',
     driver_id: '',
     invoice_address: '',
+    job_cost_ex_vat: '',
+    job_cost_inc_vat: '',
     date_of_collection: '',
     on_site_contact_number: '',
     delivery_instructions: '',
@@ -27,6 +29,7 @@ export function NewBookingModal({ onClose, onSave }) {
     job_complete: false,
     payment_type: '',
     paid: false,
+    job_notes: '',
   })
 
   const [drivers, setDrivers] = useState([])
@@ -48,6 +51,11 @@ export function NewBookingModal({ onClose, onSave }) {
   }
 
   const handleSubmit = async () => {
+    if (!formData.mobile_number || formData.mobile_number.trim() === '') {
+      alert('Mobile number is required before saving this booking.')
+      return
+    }
+
     const payload = { ...formData }
     
     // Convert checkboxes to proper booleans
@@ -85,11 +93,13 @@ export function NewBookingModal({ onClose, onSave }) {
     { name: 'county', label: 'County' },
     { name: 'post_code', label: 'Postcode *' },
     { name: 'telephone_number', label: 'Telephone' },
-    { name: 'mobile_number', label: 'Mobile' },
+    { name: 'mobile_number', label: 'Mobile *' },
     { name: 'email', label: 'Email', type: 'email' },
     { name: 'date_of_service', label: 'Date of Service *', type: 'date' },
     { name: 'driver_id', label: 'Assigned Driver *', type: 'dropdown' },
     { name: 'invoice_address', label: 'Invoice Address' },
+    { name: 'job_cost_ex_vat', label: 'Job Cost ex VAT' },
+    { name: 'job_cost_inc_vat', label: 'Job Cost inc VAT' },
     { name: 'date_of_collection', label: 'Date of Collection', type: 'date' },
     { name: 'on_site_contact_number', label: 'On-site Contact' },
     { name: 'delivery_instructions', label: 'Delivery Instructions' },
@@ -101,6 +111,7 @@ export function NewBookingModal({ onClose, onSave }) {
     { name: 'waste_transfer_note_complete', label: 'WTN Complete', type: 'checkbox' },
     { name: 'job_complete', label: 'Job Complete', type: 'checkbox' },
     { name: 'paid', label: 'Paid', type: 'checkbox' },
+    { name: 'job_notes', label: 'Job Notes', type: 'textarea' },
   ]
 
   return (
@@ -177,6 +188,9 @@ export function NewBookingModal({ onClose, onSave }) {
                   <option value="Cash">Cash</option>
                   <option value="Card">Card</option>
                   <option value="Invoice">Invoice</option>
+                  <option value="Cheque">Cheque</option>
+                  <option value="BACS">BACS</option>
+                  <option value="SumUp">SumUp</option>
                   <option value="TBD">TBD</option>
                 </select>
               ) : type === 'checkbox' ? (
@@ -186,6 +200,13 @@ export function NewBookingModal({ onClose, onSave }) {
                   checked={formData[name] || false}
                   onChange={handleChange}
                   className="ml-2"
+                />
+              ) : type === 'textarea' ? (
+                <textarea
+                  name={name}
+                  value={formData[name] || ''}
+                  onChange={handleChange}
+                  className="w-full p-2 border rounded min-h-[100px]"
                 />
               ) : (
                 <input

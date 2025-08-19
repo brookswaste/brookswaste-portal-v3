@@ -234,6 +234,11 @@ export default function Bookings() {
             <option value="Cash">Cash</option>
             <option value="Card">Card</option>
             <option value="Invoice">Invoice</option>
+            <option value="Cheque">Cheque</option>
+            <option value="BACS">BACS</option>
+            <option value="SumUp">SumUp</option>
+            <option value="TBD">TBD</option>
+
           </select>
 
           {/* Driver Filter */}
@@ -264,6 +269,7 @@ export default function Bookings() {
               <tr>
                 <th className="border px-3 py-2">Job ID</th>
                 <th className="border px-3 py-2">Job Type</th>
+                <th className="border px-3 py-2">Address Line 1</th>
                 <th className="border px-3 py-2">Postcode</th>
                 <th className="border px-3 py-2">Date of Service</th>
                 <th className="border px-3 py-2">Assigned Driver</th>
@@ -280,6 +286,7 @@ export default function Bookings() {
                 <tr key={job.id} className="text-sm">
                   <td className="border px-3 py-2">{job.id}</td>
                   <td className="border px-3 py-2">{job.job_type}</td>
+                  <td className="border px-3 py-2">{job.address_line_1}</td>
                   <td className="border px-3 py-2">{job.post_code}</td>
                   <td className="border px-3 py-2">{job.date_of_service}</td>
                   <td className="border px-3 py-2">
