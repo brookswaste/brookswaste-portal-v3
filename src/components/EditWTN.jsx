@@ -429,6 +429,23 @@ export default function EditWTN({ wtn, onClose, onSubmit }) {
                     <option key={opt} value={opt}>{opt}</option>
                   ))}
                 </select>
+              ) : name === 'sic_code' ? (
+                <select
+                  name="sic_code"
+                  value={formData.sic_code || ''}
+                  onChange={handleChange}
+                  className="w-full p-2 border rounded"
+                >
+                  <option value="">Select SIC code…</option>
+                  {SIC_OPTIONS.map(opt => {
+                    const isHeader = !/\d/.test(opt); // category header if no digits
+                    return (
+                      <option key={opt} value={isHeader ? '' : opt} disabled={isHeader}>
+                        {opt}
+                      </option>
+                    )
+                  })}
+                </select>
               ) : type === 'checkbox' ? (
                 <input
                   type="checkbox"

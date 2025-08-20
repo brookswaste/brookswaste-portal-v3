@@ -194,7 +194,7 @@ export default function NewWTN({ jobId, onClose, onSubmit }) {
     client_address: '',
     site_address: '',
     vehicle_registration: '',
-    waste_containment: '',
+    waste_containment: 'Tanker',
     sic_code: '',
     ewc: '',
     waste_description: '',
@@ -414,6 +414,23 @@ export default function NewWTN({ jobId, onClose, onSubmit }) {
                   {EWC_OPTIONS.map(opt => (
                     <option key={opt} value={opt}>{opt}</option>
                   ))}
+                </select>
+              ) : name === 'sic_code' ? (
+                <select
+                  name="sic_code"
+                  value={formData.sic_code || ''}
+                  onChange={handleChange}
+                  className="w-full p-2 border rounded"
+                >
+                  <option value="">Select SIC code…</option>
+                  {SIC_OPTIONS.map(opt => {
+                    const isHeader = !/\d/.test(opt); // category header if no digits
+                    return (
+                      <option key={opt} value={isHeader ? '' : opt} disabled={isHeader}>
+                        {opt}
+                      </option>
+                    )
+                  })}
                 </select>
               ) : name === 'disposal_address' ? (
                 <select
