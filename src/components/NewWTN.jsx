@@ -185,7 +185,7 @@ const DISPOSAL_ADDRESS_OPTIONS = [
   'Other - ______________________________________',
 ];
 
-export default function NewWTN({ jobId, onClose, onSubmit }) {
+export default function NewWTN({ jobId, onClose, onSubmit, singleColumn = false }) {
   const [formData, setFormData] = useState({
     job_id: jobId,
     client_name: '',
@@ -397,7 +397,9 @@ export default function NewWTN({ jobId, onClose, onSubmit }) {
       <div className="modal-glass bg-white p-6 rounded shadow w-full max-w-5xl">
         <h2 className="text-lg font-bold mb-4">Create Waste Transfer Note</h2>
 
-        <div className="grid grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto pr-3">
+        <div
+          className={`grid ${singleColumn ? 'grid-cols-1' : 'grid-cols-2'} gap-4 max-h-[60vh] overflow-y-auto pr-3`}
+        >
           {fields.map(({ name, label, type }) => (
             <div key={name}>
               <label className="text-xs text-gray-600">{label}</label>

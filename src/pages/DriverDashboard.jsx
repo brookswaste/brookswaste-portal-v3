@@ -407,6 +407,7 @@ export default function DriverDashboard() {
       {showWTNModalForJob && (
         <NewWTN
           jobId={showWTNModalForJob}
+          singleColumn   // ← force 1 field per row for drivers
           onClose={() => setShowWTNModalForJob(null)}
           onSubmit={() => {
             setShowWTNModalForJob(null)
