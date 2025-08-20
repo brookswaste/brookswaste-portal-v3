@@ -17,6 +17,10 @@ export default function Bookings() {
   const [wtns, setWTNs] = useState({})
   const [searchTerm, setSearchTerm] = useState('')
   const [archivedSearch, setArchivedSearch] = useState('')
+  const [archivedPaidFilter, setArchivedPaidFilter] = useState('All')
+  const [archivedPaymentTypeFilter, setArchivedPaymentTypeFilter] = useState('All')
+  const [archivedDriverFilter, setArchivedDriverFilter] = useState('')
+  const [archivedDateFilter, setArchivedDateFilter] = useState('')
   const [showArchived, setShowArchived] = useState(false)
   const [activeModal, setActiveModal] = useState(null)
   const [selectedJob, setSelectedJob] = useState(null)
@@ -172,11 +176,39 @@ export default function Bookings() {
     })
 
 
-  const filteredArchivedJobs = archivedJobs.filter((job) =>
-    Object.values(job).some((val) =>
-      String(val).toLowerCase().includes(archivedSearch.toLowerCase())
+  const filteredArchivedJobs = archivedJobs
+    // text search
+    .filter(job =>
+      Object.values(job).some(val =>
+        String(val).toLowerCase().includes(archivedSearch.toLowerCase())
+      )
     )
-  )
+    // paid filter
+    .filter(job => {
+      if (archivedPaidFilter === 'All') return true
+      return archivedPaidFilter === 'Paid' ? job.paid === true : job.paid === false
+    })
+    // payment type
+    .filter(job => {
+      if (archivedPaymentTypeFilter === 'All') return true
+      return job.payment_type === archivedPaymentTypeFilter
+    })
+    // driver
+    .filter(job => {
+      if (!archivedDriverFilter) return true
+      return job.driver_id === archivedDriverFilter
+    })
+    // date
+    .filter(job => {
+      if (!archivedDateFilter) return true
+      return job.date_of_service === archivedDateFilter
+    })
+    // sort by driver name (like main table)
+    .sort((a, b) => {
+      const da = getDriverName(a.driver_id).toLowerCase()
+      const db = getDriverName(b.driver_id).toLowerCase()
+      return da.localeCompare(db)
+    })
 
   return (
     <div className="admin-page bg-gradient-to-br from-white to-slate-100 min-h-screen px-4 py-6 text-sm relative">
@@ -401,6 +433,56 @@ export default function Bookings() {
               onChange={(e) => setArchivedSearch(e.target.value)}
               className="w-full p-3 mt-6 rounded border focus:outline-none"
             />
+
+            {/* Archived filters (same as main) */}
+            <div className="flex flex-wrap gap-4 my-4">
+              {/* Paid Filter */}
+              <select
+                className="p-2 rounded border"
+                value={archivedPaidFilter}
+                onChange={(e) => setArchivedPaidFilter(e.target.value)}
+              >
+                <option value="All">All Jobs</option>
+                <option value="Paid">Paid</option>
+                <option value="Unpaid">Unpaid</option>
+              </select>
+
+              {/* Payment Type Filter */}
+              <select
+                className="p-2 rounded border"
+                value={archivedPaymentTypeFilter}
+                onChange={(e) => setArchivedPaymentTypeFilter(e.target.value)}
+              >
+                <option value="All">All Payment Types</option>
+                <option value="Cash">Cash</option>
+                <option value="Card">Card</option>
+                <option value="Invoice">Invoice</option>
+                <option value="Cheque">Cheque</option>
+                <option value="BACS">BACS</option>
+                <option value="SumUp">SumUp</option>
+                <option value="TBD">TBD</option>
+              </select>
+
+              {/* Driver Filter */}
+              <select
+                className="p-2 rounded border"
+                value={archivedDriverFilter}
+                onChange={(e) => setArchivedDriverFilter(e.target.value)}
+              >
+                <option value="">All Drivers</option>
+                {drivers.map((driver) => (
+                  <option key={driver.id} value={driver.id}>{driver.name}</option>
+                ))}
+              </select>
+
+              {/* Date Filter */}
+              <input
+                type="date"
+                className="p-2 rounded border"
+                value={archivedDateFilter}
+                onChange={(e) => setArchivedDateFilter(e.target.value)}
+              />
+            </div>
 
             <div className="overflow-x-auto mt-2">
               <table className="min-w-full table-auto border-collapse">
