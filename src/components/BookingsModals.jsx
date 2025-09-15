@@ -123,31 +123,94 @@ export function EditJobModal({ job, onClose, onSave }) {
   )
 }
 
-export function ViewEditArchivedJobModal({ job, onClose }) {
+export function ViewEditArchivedJobModal({ job, onClose, onSave }) {
+  const [formData, setFormData] = useState(job || {});
+
+  useEffect(() => {
+    setFormData(job || {});
+  }, [job]);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleSave = async () => {
+    if (!job?.id) {
+      alert('Missing archived job id.');
+      return;
+    }
+
+    // Build payload (don’t try to update PK or system fields)
+    const payload = { ...formData };
+    delete payload.id;
+    delete payload.original_job_id;   // keep linkage immutable
+    delete payload.archived_at;       // system timestamp
+
+    // Type coercions (adjust to your schema if needed)
+    const BOOL_FIELDS = ['paid', 'job_complete', 'invoice_required', 'invoice_sent', 'waste_transfer_note_complete'];
+    const INT_FIELDS  = ['driver_id', 'job_order', 'tank_size', 'portaloo_numbers'];
+
+    for (const k of BOOL_FIELDS) {
+      if (k in payload) {
+        const v = payload[k];
+        if (typeof v === 'string') payload[k] = v.toLowerCase() === 'true';
+      }
+    }
+    for (const k of INT_FIELDS) {
+      if (k in payload) {
+        payload[k] = payload[k] === '' || payload[k] === null ? null : Number(payload[k]);
+      }
+    }
+
+    const { error } = await supabase
+      .from('archived_jobs')
+      .update(payload)
+      .eq('id', job.id);
+
+    if (error) {
+      console.error('Update archived job error:', error);
+      alert('Failed to save changes.');
+      return;
+    }
+
+    // Refresh parent list if provided
+    if (onSave) onSave();
+    onClose();
+  };
+
   return (
     <div className="modal-overlay fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
       <div className="modal-glass bg-white p-6 rounded shadow w-[90%] max-w-2xl">
         <h2 className="text-lg font-bold mb-4">Archived Job Details</h2>
-        <div className="grid grid-cols-2 gap-3">
-          {Object.entries(job).map(([key, val]) => (
-            <div key={key}>
-              <label className="text-xs text-gray-500">{key}</label>
-              <input 
-                className="w-full p-2 border rounded"
-                defaultValue={val}
-                disabled={key === 'id'}
-              />
-            </div>
-          ))}
+
+        <div className="grid grid-cols-2 gap-3 max-h-[65vh] overflow-y-auto pr-2">
+          {Object.entries(formData).map(([key, val]) => {
+            const disabled = ['id', 'original_job_id', 'archived_at'].includes(key);
+            return (
+              <div key={key}>
+                <label className="text-xs text-gray-500">{key}</label>
+                <input
+                  name={key}
+                  className="w-full p-2 border rounded"
+                  value={val ?? ''}
+                  onChange={handleChange}
+                  disabled={disabled}
+                />
+              </div>
+            );
+          })}
         </div>
-        <div className="flex justify-between mt-4">
-          <button className="btn-bubbly">Download WTN</button>
+
+        <div className="flex justify-end gap-2 mt-4">
+          <button className="btn-bubbly" onClick={handleSave}>Save</button>
           <button className="btn-bubbly" onClick={onClose}>Close</button>
         </div>
       </div>
     </div>
-  )
+  );
 }
+
 
 export function CreateWTNModal({ jobId, onClose, onSubmit }) {
   const [signatureData, setSignatureData] = useState(null)

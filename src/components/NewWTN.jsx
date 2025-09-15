@@ -188,6 +188,7 @@ const DISPOSAL_ADDRESS_OPTIONS = [
 export default function NewWTN({ jobId, onClose, onSubmit, singleColumn = false }) {
   const [formData, setFormData] = useState({
     job_id: jobId,
+    date_of_service: '',
     client_name: '',
     client_telephone: '',
     client_email: '',
@@ -201,8 +202,6 @@ export default function NewWTN({ jobId, onClose, onSubmit, singleColumn = false 
     amount_removed: '',
     disposal_address: '',
     job_description: '',
-    portaloo_dropoff_date: '',
-    portaloo_collection_date: '',
     time_in: '',
     time_out: '',
     operative_signature: '',
@@ -254,6 +253,7 @@ export default function NewWTN({ jobId, onClose, onSubmit, singleColumn = false 
         county,
         post_code,
         job_type,
+        date_of_service,
       } = job
 
       const fullAddress = [
@@ -269,6 +269,7 @@ export default function NewWTN({ jobId, onClose, onSubmit, singleColumn = false 
 
       setFormData((prev) => ({
         ...prev,
+        date_of_service: date_of_service || '',
         client_name: customer_name || '',
         client_telephone: mobile_number || '',
         client_address: fullAddress || '',
@@ -371,6 +372,7 @@ export default function NewWTN({ jobId, onClose, onSubmit, singleColumn = false 
   }
 
   const fields = [
+    { name: 'date_of_service', label: 'Date of Service', type: 'date' },
     { name: 'client_name', label: 'Client Name' },
     { name: 'client_telephone', label: 'Client Telephone' },
     { name: 'client_email', label: 'Client Email' },
@@ -384,8 +386,6 @@ export default function NewWTN({ jobId, onClose, onSubmit, singleColumn = false 
     { name: 'amount_removed', label: 'Amount of Waste Removed' },
     { name: 'disposal_address', label: 'Disposal Address' },
     { name: 'job_description', label: 'Job Description' },
-    { name: 'portaloo_dropoff_date', label: 'Portaloo Dropoff Date', type: 'date' },
-    { name: 'portaloo_collection_date', label: 'Portaloo Collection Date', type: 'date' },
     { name: 'time_in', label: 'Time In', type: 'time' },
     { name: 'time_out', label: 'Time Out', type: 'time' },
     { name: 'driver_name', label: 'Driver Name' },

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import NewWTN from '../components/NewWTN'
+import EditWTN from '../components/EditWTN'
 import jsPDF from 'jspdf'
 
 export default function DriverDashboard() {
@@ -11,6 +12,7 @@ export default function DriverDashboard() {
   const [expandedJobId, setExpandedJobId] = useState(null)
   const [showCompleted, setShowCompleted] = useState(false)
   const [showWTNModalForJob, setShowWTNModalForJob] = useState(null)
+  const [editWTNData, setEditWTNData] = useState(null)
   const [acceptedWarning, setAcceptedWarning] = useState(false)
 
   const fetchDriverJobs = async () => {
@@ -76,6 +78,30 @@ export default function DriverDashboard() {
     return '–'
   }
 
+  const openEditWTN = async (jobId) => {
+    const { data: wtn, error } = await supabase
+      .from('waste_transfer_notes')
+      .select('*')
+      .eq('job_id', jobId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (error) {
+      console.error('Fetch WTN failed:', error)
+      alert('Could not load WTN to edit.')
+      return
+    }
+
+    // If no WTN exists yet, fall back to creating one
+    if (!wtn) {
+      setShowWTNModalForJob(jobId)
+      return
+    }
+
+    setEditWTNData(wtn)
+  }
+
   // ▼ Add directly under renderBoolIcon
   const handleDownloadWTN = async (jobId) => {
     // 1) Get the latest WTN for this job
@@ -135,6 +161,7 @@ export default function DriverDashboard() {
 
     // Same fields as EditWTN
     box('Job ID', wtn.job_id)
+    box('Date of Service', wtn.date_of_service)
     box('Client Name', wtn.client_name)
     box('Client Telephone', wtn.client_telephone)
     box('Client Email', wtn.client_email)
@@ -148,8 +175,6 @@ export default function DriverDashboard() {
     box('Amount Removed', wtn.amount_removed)
     box('Disposal Address', wtn.disposal_address)
     box('Job Description', wtn.job_description)
-    box('Portaloo Drop-off Date', wtn.portaloo_dropoff_date)
-    box('Portaloo Collection Date', wtn.portaloo_collection_date)
     box('Driver Name', wtn.driver_name)
     box('Customer Name', wtn.customer_name)
 
@@ -395,6 +420,12 @@ export default function DriverDashboard() {
                       >
                         View / Download WTN PDF
                       </button>
+                      <button
+                        className="btn-bubbly text-xs bg-amber-500 hover:bg-amber-600 mt-2 ml-2"
+                        onClick={() => openEditWTN(job.id)}
+                      >
+                        Edit WTN
+                      </button>
                     </div>
                   )}
                 </div>
@@ -411,6 +442,17 @@ export default function DriverDashboard() {
           onClose={() => setShowWTNModalForJob(null)}
           onSubmit={() => {
             setShowWTNModalForJob(null)
+            fetchDriverJobs()
+          }}
+        />
+      )}
+      
+      {editWTNData && (
+        <EditWTN
+          wtn={editWTNData}
+          onClose={() => setEditWTNData(null)}
+          onSubmit={() => {
+            setEditWTNData(null)
             fetchDriverJobs()
           }}
         />

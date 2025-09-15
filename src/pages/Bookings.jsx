@@ -9,6 +9,7 @@ import {
 } from '../components/BookingsModals'
 import NewWTN from '../components/NewWTN'
 import EditWTN from '../components/EditWTN'
+import jsPDF from 'jspdf'
 
 export default function Bookings() {
   const [jobs, setJobs] = useState([])
@@ -119,28 +120,242 @@ export default function Bookings() {
   }
 
   const handleArchive = async (job) => {
-    const { id, ...jobData } = job
+    const { id: originalJobId, ...jobData } = job;
 
-    // Force-include job_order in case it's undefined or missing
-    const fullJobData = {
+    // 1) Insert archived job first and get its id (or fetch it after)
+    const archivedJobRow = {
       ...jobData,
-      job_order: job.job_order || null // optional fallback
+      job_order: job.job_order || null,
+      original_job_id: originalJobId,
+      archived_at: new Date().toISOString(),
+    };
+
+    let archivedJobId = null;
+
+    const { data: insertedJob, error: insertArchivedJobErr } = await supabase
+      .from('archived_jobs')
+      .insert([archivedJobRow])
+      .select('id')        // RLS must allow SELECT for this to return data
+      .maybeSingle();
+
+    if (insertArchivedJobErr) {
+      console.error('[Archive] Insert archived job error:', insertArchivedJobErr);
+      alert('Could not archive the job (see console).');
+      return;
     }
 
-    const { error } = await supabase.from('archived_jobs').insert([fullJobData])
-    if (!error) {
-      await supabase.from('jobs').delete().eq('id', id)
-      fetchJobs()
-      fetchArchivedJobs()
+    if (insertedJob?.id) {
+      archivedJobId = insertedJob.id;
     } else {
-      console.error('Archive error:', error)
+      // Fallback if RLS hid the returning row: find the row we just inserted
+      const { data: fallback, error: fbErr } = await supabase
+        .from('archived_jobs')
+        .select('id')
+        .eq('original_job_id', originalJobId)
+        .order('id', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (fbErr || !fallback?.id) {
+        console.error('[Archive] Could not retrieve archived job id', fbErr);
+        alert('Archived job created, but could not fetch its id (RLS?).');
+        return;
+      }
+      archivedJobId = fallback.id;
     }
-  }
+
+    // 2) Fetch live WTNs
+    const { data: wtNotes, error: wtnFetchErr } = await supabase
+      .from('waste_transfer_notes')
+      .select('*')
+      .eq('job_id', originalJobId);
+
+    if (wtnFetchErr) {
+      console.error('[Archive] Fetch WTN error:', wtnFetchErr);
+      // Optional: clean up the archived job if you want atomicity
+      // await supabase.from('archived_jobs').delete().eq('id', archivedJobId);
+      alert('Could not fetch the WTN for this job. Archive aborted.');
+      return;
+    }
+
+    // 3) Copy WTNs into archived table, linking to archived job
+    if (wtNotes?.length) {
+      const rows = wtNotes.map(({ id: original_wtn_id, created_at, updated_at, ...rest }) => ({
+        ...rest,                             // original WTN fields
+        job_id: originalJobId,               // keep original job id for reference
+        original_wtn_id,                     // remember original WTN id
+        archived_job_id: archivedJobId,      // << crucial: NOT NULL column
+        archived_at: new Date().toISOString()
+      }));
+
+      const { error: insertArchivedWtnErr } = await supabase
+        .from('archived_waste_transfer_notes')
+        .insert(rows);
+
+      if (insertArchivedWtnErr) {
+        console.error('[Archive] Insert archived WTN error:', insertArchivedWtnErr);
+        // Optional: rollback archived job
+        // await supabase.from('archived_jobs').delete().eq('id', archivedJobId);
+        alert('Could not archive the WTN (see console). Archive aborted.');
+        return;
+      }
+
+      // 4) Delete live WTNs after archiving
+      const { error: delLiveWtnErr } = await supabase
+        .from('waste_transfer_notes')
+        .delete()
+        .in('id', wtNotes.map(w => w.id));
+
+      if (delLiveWtnErr) {
+        console.error('[Archive] Delete live WTN error:', delLiveWtnErr);
+        alert('Archived, but failed to delete the live WTN (see console).');
+        // Continue anyway
+      }
+    }
+
+    // 5) Delete the live job
+    const { error: delJobErr } = await supabase
+      .from('jobs')
+      .delete()
+      .eq('id', originalJobId);
+
+    if (delJobErr) {
+      console.error('[Archive] Delete live job error:', delJobErr);
+      alert('Archived, but failed to delete the live job (see console).');
+      return;
+    }
+
+    // 6) Refresh UI
+    fetchJobs();
+    fetchArchivedJobs();
+  };
 
   const handleEdit = (job) => {
     setSelectedJob(job)
     setActiveModal('edit')
   }
+
+  // Build & download a WTN PDF for an archived job
+  const handleDownloadArchivedWTN = async (archivedJob) => {
+    // Prefer the original job id saved when archiving (see step 2)
+    const jobRef = archivedJob.original_job_id ?? archivedJob.id;
+
+    // 1) Try archived WTNs first
+    let { data: wtn, error } = await supabase
+      .from('archived_waste_transfer_notes')
+      .select('*')
+      .eq('job_id', jobRef)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    // 2) Fallback to live WTNs
+    if (error || !wtn) {
+      const res2 = await supabase
+        .from('waste_transfer_notes')
+        .select('*')
+        .eq('job_id', jobRef)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      wtn = res2.data;
+    }
+
+    if (!wtn) {
+      alert('No WTN found for this archived job.');
+      return;
+    }
+
+    const loadImage = (src) =>
+      new Promise((resolve, reject) => {
+        if (!src) return resolve(null);
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = src;
+      });
+
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+    try {
+      const logoImg = await loadImage('/images/brooks-logo.png');
+      if (logoImg) doc.addImage(logoImg, 'PNG', 150, 10, 40, 0);
+    } catch (_) {}
+
+    // Header
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(18);
+    doc.setTextColor('#000000');
+    doc.text('Brooks Waste – Sewage Specialist', 10, 15);
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Kendale The Drive, Rayleigh Essex, SS6 8XQ', 10, 21);
+    doc.text('01268776126 · info@brookswaste.co.uk · www.brookswaste.co.uk', 10, 26);
+    doc.text('Waste Carriers Reg #: CBDU167551', 10, 31);
+
+    let y = 40;
+    const box = (label, value) => {
+      doc.setDrawColor(100);
+      doc.setLineWidth(0.2);
+      doc.rect(10, y, 190, 8);
+      doc.setFontSize(10);
+      doc.text(`${label}: ${value ?? '-'}`, 12, y + 5);
+      y += 10;
+    };
+
+    box('Job ID', wtn.job_id);
+    box('Date of Service', wtn.date_of_service ?? archivedJob?.date_of_service ?? '-');
+    box('Client Name', wtn.client_name);
+    box('Client Telephone', wtn.client_telephone);
+    box('Client Email', wtn.client_email);
+    box('Client Address', wtn.client_address);
+    box('Site Address', wtn.site_address);
+    box('Vehicle Registration', wtn.vehicle_registration);
+    box('Waste Containment', wtn.waste_containment);
+    box('SIC Code', wtn.sic_code);
+    box('EWC', wtn.ewc);
+    box('Waste Description', wtn.waste_description);
+    box('Amount Removed', wtn.amount_removed);
+    box('Disposal Address', wtn.disposal_address);
+    box('Job Description', wtn.job_description);
+    box('Driver Name', wtn.driver_name);
+    box('Customer Name', wtn.customer_name);
+
+    // Signatures
+    y += 15;
+    if (y > 250) y = 250;
+
+    const signatureHeight = 30;
+    const signatureWidth = 60;
+
+    doc.setFontSize(10);
+    doc.text('Driver Signature:', 10, y);
+    doc.text('Customer Signature:', 110, y);
+
+    try {
+      const opSig = await loadImage(wtn.operative_signature);
+      if (opSig) doc.addImage(opSig, 'PNG', 10, y + 5, signatureWidth, signatureHeight);
+    } catch (_) {}
+
+    try {
+      const custSig = await loadImage(wtn.customer_signature);
+      if (custSig) doc.addImage(custSig, 'PNG', 110, y + 5, signatureWidth, signatureHeight);
+    } catch (_) {}
+
+    // Footer
+    doc.setTextColor('#000');
+    doc.setFontSize(7);
+    doc.text(
+      'You are signing to say you have read the above details and that they are correct and the operative has completed the job to a satisfactory standard. Brooks Waste ltd takes no responsibility for any damage done to your property where access is not suitable for a tanker. Please see our full terms and conditions on brookswaste.co.uk - Registered in England 06747484 Registered Office: 4 Chester Court, Chester Hall Lane Basildon, Essex SS14 3WR',
+      10,
+      282,
+      { maxWidth: 190 }
+    );
+
+    doc.save(`WTN_Job_${wtn.job_id}.pdf`);
+  };
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -520,6 +735,12 @@ export default function Bookings() {
                         >
                           View/Edit
                         </button>
+                        <button
+                          className="btn-bubbly text-xs px-3 py-1 ml-2"
+                          onClick={() => handleDownloadArchivedWTN(job)}
+                        >
+                          WTN PDF
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -552,7 +773,7 @@ export default function Bookings() {
         <ViewWTNPDFModal pdfUrl={wtnPDFUrl} onClose={() => setActiveModal(null)} />
       )}
       {activeModal === 'viewArchived' && (
-        <ViewEditArchivedJobModal job={selectedJob} onClose={() => setActiveModal(null)} />
+        <ViewEditArchivedJobModal job={selectedJob} onClose={() => setActiveModal(null)} onSave={fetchArchivedJobs} />
       )}
       {activeModal === 'add' && (
         <NewBookingModal

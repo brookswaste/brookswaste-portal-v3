@@ -312,6 +312,7 @@ export default function EditWTN({ wtn, onClose, onSubmit }) {
 
       // New Fields
       box('Job ID', formData.job_id);
+      box('Date of Service', formData.date_of_service);
       box('Client Name', formData.client_name);
       box('Client Telephone', formData.client_telephone);
       box('Client Email', formData.client_email);
@@ -325,8 +326,6 @@ export default function EditWTN({ wtn, onClose, onSubmit }) {
       box('Amount Removed', formData.amount_removed);
       box('Disposal Address', formData.disposal_address);
       box('Job Description', formData.job_description);
-      box('Portaloo Drop-off Date', formData.portaloo_dropoff_date);
-      box('Portaloo Collection Date', formData.portaloo_collection_date);
       box('Time In', formData.time_in);
       box('Time Out', formData.time_out);
       box('Driver Name', formData.driver_name);
@@ -373,6 +372,7 @@ export default function EditWTN({ wtn, onClose, onSubmit }) {
   if (!formData) return null
 
   const fields = [
+    { name: 'date_of_service', label: 'Date of Service', type: 'date' },
     { name: 'client_name', label: 'Client Name' },
     { name: 'client_telephone', label: 'Client Telephone' },
     { name: 'client_email', label: 'Client Email' },
@@ -386,8 +386,6 @@ export default function EditWTN({ wtn, onClose, onSubmit }) {
     { name: 'amount_removed', label: 'Amount Removed' },
     { name: 'disposal_address', label: 'Disposal Address' },
     { name: 'job_description', label: 'Job Description' },
-    { name: 'portaloo_dropoff_date', label: 'Portaloo Drop-off Date', type: 'date' },
-    { name: 'portaloo_collection_date', label: 'Portaloo Collection Date', type: 'date' },
     { name: 'time_in', label: 'Time In', type: 'time' },
     { name: 'time_out', label: 'Time Out', type: 'time' },
     { name: 'driver_name', label: 'Driver Name' },
