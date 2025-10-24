@@ -494,10 +494,10 @@ export default function NewWTN({ jobId, onClose, onSubmit, singleColumn = false 
         </div>
 
         <div className="flex justify-end gap-2 mt-6">
-          <button className="btn-bubbly" disabled={loading} onClick={handleSubmit}>
+          <button className="btn btn-primary btn-md" disabled={loading} onClick={handleSubmit}>
             {loading ? 'Saving...' : 'Save'}
           </button>
-          <button className="btn-bubbly" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary btn-md" onClick={onClose}>Cancel</button>
         </div>
       </div>
     </div>

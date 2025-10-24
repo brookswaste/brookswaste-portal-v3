@@ -115,8 +115,8 @@ export function EditJobModal({ job, onClose, onSave }) {
           ))}
         </div>
         <div className="flex justify-end gap-2 mt-6">
-          <button className="btn-bubbly" onClick={handleSubmit}>Save</button>
-          <button className="btn-bubbly" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary btn-md" onClick={handleSubmit}>Save</button>
+          <button className="btn btn-primary btn-md" onClick={onClose}>Cancel</button>
         </div>
       </div>
     </div>
@@ -203,8 +203,8 @@ export function ViewEditArchivedJobModal({ job, onClose, onSave }) {
         </div>
 
         <div className="flex justify-end gap-2 mt-4">
-          <button className="btn-bubbly" onClick={handleSave}>Save</button>
-          <button className="btn-bubbly" onClick={onClose}>Close</button>
+          <button className="btn btn-primary btn-md" onClick={handleSave}>Save</button>
+          <button className="btn btn-primary btn-md" onClick={onClose}>Close</button>
         </div>
       </div>
     </div>
@@ -246,8 +246,8 @@ export function CreateWTNModal({ jobId, onClose, onSubmit }) {
           </div>
         </div>
         <div className="flex justify-end gap-2 mt-4">
-          <button className="btn-bubbly" onClick={handleSave}>Submit WTN</button>
-          <button className="btn-bubbly" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary btn-md" onClick={handleSave}>Submit WTN</button>
+          <button className="btn btn-primary btn-md" onClick={onClose}>Cancel</button>
         </div>
       </div>
     </div>
@@ -261,8 +261,8 @@ export function ViewWTNPDFModal({ pdfUrl, onClose }) {
         <h2 className="text-xl font-bold mb-3">Waste Transfer Note Preview</h2>
         <iframe src={pdfUrl} className="w-full h-[600px] border rounded bg-white" />
         <div className="flex justify-end mt-4">
-          <a href={pdfUrl} download className="btn-bubbly mr-2">Download PDF</a>
-          <button className="btn-bubbly" onClick={onClose}>Close</button>
+          <a href={pdfUrl} download className="btn btn-primary btn-md mr-2">Download PDF</a>
+          <button className="btn btn-primary btn-md" onClick={onClose}>Close</button>
         </div>
       </div>
     </div>

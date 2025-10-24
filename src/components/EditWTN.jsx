@@ -485,13 +485,13 @@ export default function EditWTN({ wtn, onClose, onSubmit }) {
         </div>
 
         <div className="flex justify-end gap-2 mt-6">
-          <button className="btn-bubbly" onClick={handleDownloadPDF}>
+          <button className="btn btn-primary btn-md" onClick={handleDownloadPDF}>
             Download PDF
           </button>
-          <button className="btn-bubbly" disabled={loading} onClick={handleUpdate}>
+          <button className="btn btn-primary btn-md" disabled={loading} onClick={handleUpdate}>
             {loading ? 'Saving...' : 'Save'}
           </button>
-          <button className="btn-bubbly" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary btn-md" onClick={onClose}>Cancel</button>
         </div>
       </div>
     </div>

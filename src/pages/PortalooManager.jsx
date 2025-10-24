@@ -100,7 +100,7 @@ export default function PortalooManager() {
         >
           ← Back to Admin Dashboard
         </button>
-        <button onClick={handleLogout} className="btn-bubbly px-4 py-1 text-sm">
+        <button onClick={handleLogout} className="btn btn-primary btn-md px-4 py-1 text-sm">
           Log Out
         </button>
       </div>

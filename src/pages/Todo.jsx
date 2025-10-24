@@ -124,7 +124,7 @@ export default function Todo() {
       {/* Log Out (top-right) */}
       <button
         onClick={handleLogout}
-        className="btn-bubbly absolute top-4 right-6 text-sm px-4 py-2"
+        className="btn btn-primary btn-md absolute top-4 right-6 text-sm px-4 py-2"
       >
         Log Out
       </button>
@@ -143,7 +143,7 @@ export default function Todo() {
 
           <button
             onClick={() => setShowForm(v => !v)}
-            className="btn-bubbly text-sm px-4 py-2"
+            className="btn btn-primary btn-md text-sm px-4 py-2"
           >
             {showForm ? 'Close' : 'New Task'}
           </button>
@@ -211,7 +211,7 @@ export default function Todo() {
             </div>
 
             <div className="mt-4 flex justify-end">
-              <button className="btn-bubbly" onClick={handleAddTask}>
+              <button className="btn btn-primary btn-md" onClick={handleAddTask}>
                 Add Task
               </button>
             </div>
@@ -274,7 +274,7 @@ export default function Todo() {
                       />
                       <div className="mt-2">
                         <button
-                          className="btn-bubbly text-xs"
+                          className="btn btn-primary btn-md text-xs"
                           onClick={async () => {
                             const draft = commentDrafts[task.id]
                             if (!draft?.text?.trim()) return
@@ -322,7 +322,7 @@ export default function Todo() {
 
                     {/* Delete */}
                     <button
-                      className="btn-bubbly text-xs"
+                      className="btn btn-primary btn-md text-xs"
                       onClick={() => deleteTask(task.id)}
                       title="Delete task"
                     >

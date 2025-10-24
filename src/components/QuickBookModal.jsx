@@ -124,8 +124,8 @@ export default function QuickBookModal({ onClose, onSave }) {
               className="w-full p-3 border border-gray-300 rounded mb-4"
             />
             <div className="flex justify-end gap-2">
-              <button className="btn-bubbly" onClick={onClose}>Cancel</button>
-              <button className="btn-bubbly" onClick={handlePasswordSubmit}>Unlock</button>
+              <button className="btn btn-primary btn-md" onClick={onClose}>Cancel</button>
+              <button className="btn btn-primary btn-md" onClick={handlePasswordSubmit}>Unlock</button>
             </div>
           </>
         ) : (
@@ -178,8 +178,8 @@ export default function QuickBookModal({ onClose, onSave }) {
               ))}
             </div>
             <div className="flex justify-end gap-2 mt-6">
-              <button className="btn-bubbly" onClick={handleSubmit}>Save</button>
-              <button className="btn-bubbly" onClick={onClose}>Cancel</button>
+              <button className="btn btn-primary btn-md" onClick={handleSubmit}>Save</button>
+              <button className="btn btn-primary btn-md" onClick={onClose}>Cancel</button>
             </div>
           </>
         )}

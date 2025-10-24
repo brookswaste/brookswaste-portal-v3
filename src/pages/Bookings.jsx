@@ -42,9 +42,9 @@ export default function Bookings() {
 
   const fetchJobs = async () => {
     const { data, error } = await supabase
-    .from('jobs')
-    .select('*')
-    .order('id', { ascending: true })
+      .from('jobs')
+      .select('*')
+      .order('id', { ascending: true })
     if (!error) setJobs(data)
   }
 
@@ -92,7 +92,6 @@ export default function Bookings() {
     if (!error) fetchJobs()
   }
 
-
   const updateJobOrder = async (jobId, order) => {
     const { error } = await supabase
       .from('jobs')
@@ -103,7 +102,7 @@ export default function Bookings() {
   }
 
   const handleNewWTN = async (job) => {
-    const { data: existing, error } = await supabase
+    const { data: existing } = await supabase
       .from('waste_transfer_notes')
       .select('*')
       .eq('job_id', job.id)
@@ -122,7 +121,7 @@ export default function Bookings() {
   const handleArchive = async (job) => {
     const { id: originalJobId, ...jobData } = job;
 
-    // 1) Insert archived job first and get its id (or fetch it after)
+    // 1) Insert archived job
     const archivedJobRow = {
       ...jobData,
       job_order: job.job_order || null,
@@ -135,7 +134,7 @@ export default function Bookings() {
     const { data: insertedJob, error: insertArchivedJobErr } = await supabase
       .from('archived_jobs')
       .insert([archivedJobRow])
-      .select('id')        // RLS must allow SELECT for this to return data
+      .select('id')
       .maybeSingle();
 
     if (insertArchivedJobErr) {
@@ -147,7 +146,6 @@ export default function Bookings() {
     if (insertedJob?.id) {
       archivedJobId = insertedJob.id;
     } else {
-      // Fallback if RLS hid the returning row: find the row we just inserted
       const { data: fallback, error: fbErr } = await supabase
         .from('archived_jobs')
         .select('id')
@@ -164,7 +162,7 @@ export default function Bookings() {
       archivedJobId = fallback.id;
     }
 
-    // 2) Fetch live WTNs
+    // 2) Copy WTNs into archived table
     const { data: wtNotes, error: wtnFetchErr } = await supabase
       .from('waste_transfer_notes')
       .select('*')
@@ -172,19 +170,16 @@ export default function Bookings() {
 
     if (wtnFetchErr) {
       console.error('[Archive] Fetch WTN error:', wtnFetchErr);
-      // Optional: clean up the archived job if you want atomicity
-      // await supabase.from('archived_jobs').delete().eq('id', archivedJobId);
       alert('Could not fetch the WTN for this job. Archive aborted.');
       return;
     }
 
-    // 3) Copy WTNs into archived table, linking to archived job
     if (wtNotes?.length) {
       const rows = wtNotes.map(({ id: original_wtn_id, created_at, updated_at, ...rest }) => ({
-        ...rest,                             // original WTN fields
-        job_id: originalJobId,               // keep original job id for reference
-        original_wtn_id,                     // remember original WTN id
-        archived_job_id: archivedJobId,      // << crucial: NOT NULL column
+        ...rest,
+        job_id: originalJobId,
+        original_wtn_id,
+        archived_job_id: archivedJobId,
         archived_at: new Date().toISOString()
       }));
 
@@ -194,13 +189,10 @@ export default function Bookings() {
 
       if (insertArchivedWtnErr) {
         console.error('[Archive] Insert archived WTN error:', insertArchivedWtnErr);
-        // Optional: rollback archived job
-        // await supabase.from('archived_jobs').delete().eq('id', archivedJobId);
         alert('Could not archive the WTN (see console). Archive aborted.');
         return;
       }
 
-      // 4) Delete live WTNs after archiving
       const { error: delLiveWtnErr } = await supabase
         .from('waste_transfer_notes')
         .delete()
@@ -209,11 +201,10 @@ export default function Bookings() {
       if (delLiveWtnErr) {
         console.error('[Archive] Delete live WTN error:', delLiveWtnErr);
         alert('Archived, but failed to delete the live WTN (see console).');
-        // Continue anyway
       }
     }
 
-    // 5) Delete the live job
+    // 3) Delete live job
     const { error: delJobErr } = await supabase
       .from('jobs')
       .delete()
@@ -225,7 +216,7 @@ export default function Bookings() {
       return;
     }
 
-    // 6) Refresh UI
+    // 4) Refresh UI
     fetchJobs();
     fetchArchivedJobs();
   };
@@ -235,13 +226,10 @@ export default function Bookings() {
     setActiveModal('edit')
   }
 
-  // Build & download a WTN PDF for an archived job
   const handleDownloadArchivedWTN = async (archivedJob) => {
-    // Prefer the original job id saved when archiving (see step 2)
     const jobRef = archivedJob.original_job_id ?? archivedJob.id;
 
-    // 1) Try archived WTNs first
-    let { data: wtn, error } = await supabase
+    let { data: wtn } = await supabase
       .from('archived_waste_transfer_notes')
       .select('*')
       .eq('job_id', jobRef)
@@ -249,8 +237,7 @@ export default function Bookings() {
       .limit(1)
       .maybeSingle();
 
-    // 2) Fallback to live WTNs
-    if (error || !wtn) {
+    if (!wtn) {
       const res2 = await supabase
         .from('waste_transfer_notes')
         .select('*')
@@ -283,7 +270,6 @@ export default function Bookings() {
       if (logoImg) doc.addImage(logoImg, 'PNG', 150, 10, 40, 0);
     } catch (_) {}
 
-    // Header
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(18);
     doc.setTextColor('#000000');
@@ -322,7 +308,6 @@ export default function Bookings() {
     box('Driver Name', wtn.driver_name);
     box('Customer Name', wtn.customer_name);
 
-    // Signatures
     y += 15;
     if (y > 250) y = 250;
 
@@ -343,7 +328,6 @@ export default function Bookings() {
       if (custSig) doc.addImage(custSig, 'PNG', 110, y + 5, signatureWidth, signatureHeight);
     } catch (_) {}
 
-    // Footer
     doc.setTextColor('#000');
     doc.setFontSize(7);
     doc.text(
@@ -389,35 +373,28 @@ export default function Bookings() {
       return driverA.localeCompare(driverB)
     })
 
-
   const filteredArchivedJobs = archivedJobs
-    // text search
     .filter(job =>
       Object.values(job).some(val =>
         String(val).toLowerCase().includes(archivedSearch.toLowerCase())
       )
     )
-    // paid filter
     .filter(job => {
       if (archivedPaidFilter === 'All') return true
       return archivedPaidFilter === 'Paid' ? job.paid === true : job.paid === false
     })
-    // payment type
     .filter(job => {
       if (archivedPaymentTypeFilter === 'All') return true
       return job.payment_type === archivedPaymentTypeFilter
     })
-    // driver
     .filter(job => {
       if (!archivedDriverFilter) return true
       return job.driver_id === archivedDriverFilter
     })
-    // date
     .filter(job => {
       if (!archivedDateFilter) return true
       return job.date_of_service === archivedDateFilter
     })
-    // sort by driver name (like main table)
     .sort((a, b) => {
       const da = getDriverName(a.driver_id).toLowerCase()
       const db = getDriverName(b.driver_id).toLowerCase()
@@ -425,94 +402,107 @@ export default function Bookings() {
     })
 
   return (
-    <div className="admin-page bg-gradient-to-br from-white to-slate-100 min-h-screen px-4 py-6 text-sm relative">
-      <button
-        onClick={handleLogout}
-        className="btn-bubbly absolute top-4 right-6 text-sm px-4 py-2"
-      >
-        Log Out
-      </button>
+    <div className="min-h-screen bg-gradient-to-br from-white to-slate-100 pt-16 relative">
+      {/* Header */}
+      <header className="fixed top-0 left-0 right-0 bg-white border-b z-50">
+        <div className="mx-auto max-w-screen-lg px-4 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <img src="/images/brooks-logo.png" alt="Brooks Waste" className="h-8" />
+            <div className="h-6 w-px bg-gray-300" />
+            <h1 className="text-sm font-semibold text-black">Bookings</h1>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={() => setActiveModal('add')}
+            >
+              Add New Booking
+            </button>
+            <button
+              className="btn btn-neutral btn-sm"
+              onClick={() => navigate('/todo')}
+            >
+              Open To-Do
+            </button>
+            <button
+              className="btn btn-neutral btn-sm"
+              onClick={handleLogout}
+            >
+              Log Out
+            </button>
+          </div>
+        </div>
+      </header>
 
-      <div className="max-w-7xl mx-auto space-y-6">
+      <div className="mx-auto max-w-screen-lg px-4 py-6 space-y-6">
+        {/* Back link */}
         <div className="text-sm text-gray-500">
           <button onClick={() => navigate('/admin-dashboard')} className="hover:underline">
             ← Back to Admin Dashboard
           </button>
         </div>
 
-        <div className="text-center">
-          <button
-            className="btn-bubbly text-lg px-6 py-3"
-            onClick={() => setActiveModal('add')}
-          >
-            Add New Booking
-          </button>
+        {/* Search & Filters */}
+        <div className="rounded-2xl bg-white shadow-sm border p-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <input
+              type="text"
+              placeholder="Search jobs…"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="md:col-span-2 p-2 rounded border w-full focus:outline-none focus:ring-2 focus:ring-pink-400"
+            />
+
+            <select
+              className="p-2 rounded border"
+              value={paidFilter}
+              onChange={(e) => setPaidFilter(e.target.value)}
+            >
+              <option value="All">All Jobs</option>
+              <option value="Paid">Paid</option>
+              <option value="Unpaid">Unpaid</option>
+            </select>
+
+            <select
+              className="p-2 rounded border"
+              value={paymentTypeFilter}
+              onChange={(e) => setPaymentTypeFilter(e.target.value)}
+            >
+              <option value="All">All Payment Types</option>
+              <option value="Cash">Cash</option>
+              <option value="Card">Card</option>
+              <option value="Invoice">Invoice</option>
+              <option value="Cheque">Cheque</option>
+              <option value="BACS">BACS</option>
+              <option value="SumUp">SumUp</option>
+              <option value="TBD">TBD</option>
+            </select>
+
+            <select
+              className="p-2 rounded border"
+              value={selectedDriverFilter}
+              onChange={(e) => setSelectedDriverFilter(e.target.value)}
+            >
+              <option value="">All Drivers</option>
+              {drivers.map((driver) => (
+                <option key={driver.id} value={driver.id}>{driver.name}</option>
+              ))}
+            </select>
+
+            <input
+              type="date"
+              className="p-2 rounded border"
+              value={selectedDateFilter}
+              onChange={(e) => setSelectedDateFilter(e.target.value)}
+            />
+          </div>
         </div>
 
-        <input
-          type="text"
-          placeholder="Search jobs..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full p-3 rounded border focus:outline-none"
-        />
-
-        <div className="flex flex-wrap gap-4 my-4">
-
-          {/* Paid Filter */}
-          <select
-            className="p-2 rounded border"
-            value={paidFilter}
-            onChange={(e) => setPaidFilter(e.target.value)}
-          >
-            <option value="All">All Jobs</option>
-            <option value="Paid">Paid</option>
-            <option value="Unpaid">Unpaid</option>
-          </select>
-
-          {/* Payment Type Filter */}
-          <select
-            className="p-2 rounded border"
-            value={paymentTypeFilter}
-            onChange={(e) => setPaymentTypeFilter(e.target.value)}
-          >
-            <option value="All">All Payment Types</option>
-            <option value="Cash">Cash</option>
-            <option value="Card">Card</option>
-            <option value="Invoice">Invoice</option>
-            <option value="Cheque">Cheque</option>
-            <option value="BACS">BACS</option>
-            <option value="SumUp">SumUp</option>
-            <option value="TBD">TBD</option>
-
-          </select>
-
-          {/* Driver Filter */}
-          <select
-            className="p-2 rounded border"
-            value={selectedDriverFilter}
-            onChange={(e) => setSelectedDriverFilter(e.target.value)}
-          >
-            <option value="">All Drivers</option>
-            {drivers.map((driver) => (
-              <option key={driver.id} value={driver.id}>{driver.name}</option>
-            ))}
-          </select>
-
-          {/* Date Filter */}
-          <input
-            type="date"
-            className="p-2 rounded border"
-            value={selectedDateFilter}
-            onChange={(e) => setSelectedDateFilter(e.target.value)}
-          />
-        </div>
-
-
-        <div className="overflow-x-auto max-h-[500px] overflow-y-auto border rounded">
-          <table className="min-w-full table-auto border-collapse">
-            <thead className="bg-gray-200 sticky top-0 z-10">
-              <tr>
+        {/* Live Jobs Table */}
+        <div className="rounded-2xl bg-white shadow-sm border overflow-x-auto">
+          <table className="min-w-full border-collapse">
+            <thead className="bg-pink-50 sticky top-0 z-10">
+              <tr className="text-left text-xs font-semibold text-black uppercase tracking-wider">
                 <th className="border px-3 py-2">Job ID</th>
                 <th className="border px-3 py-2">Job Type</th>
                 <th className="border px-3 py-2">Address Line 1</th>
@@ -529,7 +519,7 @@ export default function Bookings() {
             </thead>
             <tbody>
               {filteredJobs.map((job) => (
-                <tr key={job.id} className="text-sm">
+                <tr key={job.id} className="text-sm hover:bg-pink-50">
                   <td className="border px-3 py-2">{job.id}</td>
                   <td className="border px-3 py-2">{job.job_type}</td>
                   <td className="border px-3 py-2">{job.address_line_1}</td>
@@ -613,13 +603,13 @@ export default function Bookings() {
                   </td>
                   <td className="border px-3 py-2">
                     <div className="flex gap-2 flex-nowrap">
-                      <button className="btn-bubbly text-xs px-3 py-1" onClick={() => handleEdit(job)}>Edit</button>
+                      <button className="btn btn-neutral btn-xs" onClick={() => handleEdit(job)}>Edit</button>
                       {wtns[job.id] ? (
-                        <button className="btn-bubbly text-xs px-3 py-1" onClick={() => handleNewWTN(job)}>Edit WTN</button>
+                        <button className="btn btn-neutral btn-xs" onClick={() => handleNewWTN(job)}>Edit WTN</button>
                       ) : (
-                        <button className="btn-bubbly text-xs px-3 py-1" onClick={() => handleNewWTN(job)}>New WTN</button>
+                        <button className="btn btn-neutral btn-xs" onClick={() => handleNewWTN(job)}>New WTN</button>
                       )}
-                      <button className="btn-bubbly text-xs px-3 py-1" onClick={() => handleArchive(job)}>Archive</button>
+                      <button className="btn btn-neutral btn-xs" onClick={() => handleArchive(job)}>Archive</button>
                     </div>
                   </td>
                 </tr>
@@ -629,9 +619,9 @@ export default function Bookings() {
         </div>
 
         {/* Archived Jobs Toggle */}
-        <div className="text-center mt-10">
+        <div className="text-center">
           <button
-            className="btn-bubbly px-4 py-2 text-sm"
+            className="btn btn-neutral btn-sm"
             onClick={() => setShowArchived(!showArchived)}
           >
             {showArchived ? 'Hide Archived Jobs' : 'Show Archived Jobs'}
@@ -640,68 +630,65 @@ export default function Bookings() {
 
         {showArchived && (
           <>
-            <input
-              type="text"
-              placeholder="Search archived jobs..."
-              value={archivedSearch}
-              onChange={(e) => setArchivedSearch(e.target.value)}
-              className="w-full p-3 mt-6 rounded border focus:outline-none"
-            />
+            <div className="rounded-2xl bg-white shadow-sm border p-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <input
+                  type="text"
+                  placeholder="Search archived jobs…"
+                  value={archivedSearch}
+                  onChange={(e) => setArchivedSearch(e.target.value)}
+                  className="md:col-span-2 p-2 rounded border w-full focus:outline-none focus:ring-2 focus:ring-pink-400"
+                />
 
-            {/* Archived filters (same as main) */}
-            <div className="flex flex-wrap gap-4 my-4">
-              {/* Paid Filter */}
-              <select
-                className="p-2 rounded border"
-                value={archivedPaidFilter}
-                onChange={(e) => setArchivedPaidFilter(e.target.value)}
-              >
-                <option value="All">All Jobs</option>
-                <option value="Paid">Paid</option>
-                <option value="Unpaid">Unpaid</option>
-              </select>
+                <select
+                  className="p-2 rounded border"
+                  value={archivedPaidFilter}
+                  onChange={(e) => setArchivedPaidFilter(e.target.value)}
+                >
+                  <option value="All">All Jobs</option>
+                  <option value="Paid">Paid</option>
+                  <option value="Unpaid">Unpaid</option>
+                </select>
 
-              {/* Payment Type Filter */}
-              <select
-                className="p-2 rounded border"
-                value={archivedPaymentTypeFilter}
-                onChange={(e) => setArchivedPaymentTypeFilter(e.target.value)}
-              >
-                <option value="All">All Payment Types</option>
-                <option value="Cash">Cash</option>
-                <option value="Card">Card</option>
-                <option value="Invoice">Invoice</option>
-                <option value="Cheque">Cheque</option>
-                <option value="BACS">BACS</option>
-                <option value="SumUp">SumUp</option>
-                <option value="TBD">TBD</option>
-              </select>
+                <select
+                  className="p-2 rounded border"
+                  value={archivedPaymentTypeFilter}
+                  onChange={(e) => setArchivedPaymentTypeFilter(e.target.value)}
+                >
+                  <option value="All">All Payment Types</option>
+                  <option value="Cash">Cash</option>
+                  <option value="Card">Card</option>
+                  <option value="Invoice">Invoice</option>
+                  <option value="Cheque">Cheque</option>
+                  <option value="BACS">BACS</option>
+                  <option value="SumUp">SumUp</option>
+                  <option value="TBD">TBD</option>
+                </select>
 
-              {/* Driver Filter */}
-              <select
-                className="p-2 rounded border"
-                value={archivedDriverFilter}
-                onChange={(e) => setArchivedDriverFilter(e.target.value)}
-              >
-                <option value="">All Drivers</option>
-                {drivers.map((driver) => (
-                  <option key={driver.id} value={driver.id}>{driver.name}</option>
-                ))}
-              </select>
+                <select
+                  className="p-2 rounded border"
+                  value={archivedDriverFilter}
+                  onChange={(e) => setArchivedDriverFilter(e.target.value)}
+                >
+                  <option value="">All Drivers</option>
+                  {drivers.map((driver) => (
+                    <option key={driver.id} value={driver.id}>{driver.name}</option>
+                  ))}
+                </select>
 
-              {/* Date Filter */}
-              <input
-                type="date"
-                className="p-2 rounded border"
-                value={archivedDateFilter}
-                onChange={(e) => setArchivedDateFilter(e.target.value)}
-              />
+                <input
+                  type="date"
+                  className="p-2 rounded border"
+                  value={archivedDateFilter}
+                  onChange={(e) => setArchivedDateFilter(e.target.value)}
+                />
+              </div>
             </div>
 
-            <div className="overflow-x-auto mt-2">
-              <table className="min-w-full table-auto border-collapse">
-                <thead className="bg-gray-200">
-                  <tr>
+            <div className="rounded-2xl bg-white shadow-sm border overflow-x-auto">
+              <table className="min-w-full border-collapse">
+                <thead className="bg-pink-50">
+                  <tr className="text-left text-xs font-semibold text-black uppercase tracking-wider">
                     <th className="border px-3 py-2">Job ID</th>
                     <th className="border px-3 py-2">Job Type</th>
                     <th className="border px-3 py-2">Postcode</th>
@@ -715,7 +702,7 @@ export default function Bookings() {
                 </thead>
                 <tbody>
                   {filteredArchivedJobs.map((job) => (
-                    <tr key={job.id} className="text-sm">
+                    <tr key={job.id} className="text-sm hover:bg-pink-50">
                       <td className="border px-3 py-2">{job.id}</td>
                       <td className="border px-3 py-2">{job.job_type}</td>
                       <td className="border px-3 py-2">{job.post_code}</td>
@@ -725,24 +712,33 @@ export default function Bookings() {
                       <td className="border px-3 py-2">{job.payment_type}</td>
                       <td className="border px-3 py-2">{job.paid ? 'Yes' : 'No'}</td>
                       <td className="border px-3 py-2">
-                        <button
-                          className="btn-bubbly text-xs px-3 py-1"
-                          onClick={() => {
-                            setSelectedJob(job)
-                            setActiveModal('viewArchived')
-                          }}
-                        >
-                          View/Edit
-                        </button>
-                        <button
-                          className="btn-bubbly text-xs px-3 py-1 ml-2"
-                          onClick={() => handleDownloadArchivedWTN(job)}
-                        >
-                          WTN PDF
-                        </button>
+                        <div className="flex gap-2">
+                          <button
+                            className="btn btn-neutral btn-xs"
+                            onClick={() => {
+                              setSelectedJob(job)
+                              setActiveModal('viewArchived')
+                            }}
+                          >
+                            View / Edit
+                          </button>
+                          <button
+                            className="btn btn-neutral btn-xs"
+                            onClick={() => handleDownloadArchivedWTN(job)}
+                          >
+                            WTN PDF
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
+                  {filteredArchivedJobs.length === 0 && (
+                    <tr>
+                      <td className="px-3 py-6 text-center text-gray-500" colSpan={9}>
+                        No archived jobs match your filters.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>

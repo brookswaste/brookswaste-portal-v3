@@ -240,7 +240,7 @@ export default function DriverDashboard() {
           </p>
           <button
             onClick={() => setAcceptedWarning(true)}
-            className="btn-bubbly px-6 py-2"
+            className="btn btn-primary btn-md px-6 py-2"
           >
             Confirm
           </button>
@@ -251,7 +251,7 @@ export default function DriverDashboard() {
 
   return (
     <div className="bg-wrap bg-gradient-to-br from-white to-slate-100 min-h-screen px-4 py-6 relative">
-      <button onClick={handleLogout} className="btn-bubbly absolute top-4 right-6 text-sm px-4 py-2">
+      <button onClick={handleLogout} className="btn btn-primary btn-md absolute top-4 right-6 text-sm px-4 py-2">
         Log Out
       </button>
 
@@ -284,7 +284,7 @@ export default function DriverDashboard() {
                       <p className="text-sm text-gray-600">{job.post_code}</p>
                       <p className="text-sm text-gray-600">{job.mobile_number}</p>
                     </div>
-                    <button className="btn-bubbly text-xs" onClick={() => toggleExpand(job.id)}>
+                    <button className="btn btn-primary btn-md text-xs" onClick={() => toggleExpand(job.id)}>
                       {expandedJobId === job.id ? 'Hide Details' : 'View Details'}
                     </button>
                   </div>
@@ -345,14 +345,14 @@ export default function DriverDashboard() {
                       {/* WTN + Complete Logic */}
                       {!job.waste_transfer_note_complete ? (
                         <button
-                          className="btn-bubbly text-xs bg-yellow-500 hover:bg-yellow-600 mt-2"
+                          className="btn btn-primary btn-md text-xs bg-yellow-500 hover:bg-yellow-600 mt-2"
                           onClick={() => setShowWTNModalForJob(job.id)}
                         >
                           New WTN
                         </button>
                       ) : (
                         <button
-                          className="btn-bubbly text-xs bg-green-600 hover:bg-green-700 mt-2"
+                          className="btn btn-primary btn-md text-xs bg-green-600 hover:bg-green-700 mt-2"
                           onClick={() => markJobComplete(job.id)}
                         >
                           Mark Complete
@@ -362,7 +362,7 @@ export default function DriverDashboard() {
                       {/* Mark as Paid */}
                       {!job.paid && (
                         <button
-                          className="btn-bubbly text-xs bg-lime-400 hover:bg-lime-500 mt-2 ml-2"
+                          className="btn btn-primary btn-md text-xs bg-lime-400 hover:bg-lime-500 mt-2 ml-2"
                           onClick={() => markJobPaid(job.id)}
                         >
                           Mark as Paid
@@ -396,7 +396,7 @@ export default function DriverDashboard() {
                       <p className="text-sm text-gray-600">{job.post_code}</p>
                       <p className="text-sm text-gray-600">{job.mobile_number}</p>
                     </div>
-                    <button className="btn-bubbly text-xs" onClick={() => toggleExpand(job.id)}>
+                    <button className="btn btn-primary btn-md text-xs" onClick={() => toggleExpand(job.id)}>
                       {expandedJobId === job.id ? 'Hide Details' : 'View Details'}
                     </button>
                   </div>
@@ -414,13 +414,13 @@ export default function DriverDashboard() {
                         </p>
                       ))}
                       <button
-                        className="btn-bubbly text-xs bg-blue-600 hover:bg-blue-700 mt-2"
+                        className="btn btn-primary btn-md text-xs bg-blue-600 hover:bg-blue-700 mt-2"
                         onClick={() => handleDownloadWTN(job.id)}
                       >
                         View / Download WTN PDF
                       </button>
                       <button
-                        className="btn-bubbly text-xs bg-amber-500 hover:bg-amber-600 mt-2 ml-2"
+                        className="btn btn-primary btn-md text-xs bg-amber-500 hover:bg-amber-600 mt-2 ml-2"
                         onClick={() => openEditWTN(job.id)}
                       >
                         Edit WTN

@@ -159,10 +159,10 @@ export default function EditModal({ job, onClose, onSave }) {
         </div>
 
         <div className="flex justify-end gap-2 mt-6">
-          <button className="btn-bubbly" onClick={handleSubmit}>
+          <button className="btn btn-primary btn-md" onClick={handleSubmit}>
             Save
           </button>
-          <button className="btn-bubbly" onClick={onClose}>
+          <button className="btn btn-primary btn-md" onClick={onClose}>
             Cancel
           </button>
         </div>
