@@ -311,7 +311,6 @@ export default function Bookings() {
     box('Client Telephone', wtn.client_telephone);
     box('Client Email', wtn.client_email);
     box('Client Address', wtn.client_address);
-    box('Site Address', wtn.site_address);
     box('Vehicle Registration', wtn.vehicle_registration);
     box('Waste Containment', wtn.waste_containment);
     box('SIC Code', wtn.sic_code);

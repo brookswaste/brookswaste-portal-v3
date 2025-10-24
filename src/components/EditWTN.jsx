@@ -317,7 +317,6 @@ export default function EditWTN({ wtn, onClose, onSubmit }) {
       box('Client Telephone', formData.client_telephone);
       box('Client Email', formData.client_email);
       box('Client Address', formData.client_address);
-      box('Site Address', formData.site_address);
       box('Vehicle Registration', formData.vehicle_registration);
       box('Waste Containment', formData.waste_containment);
       box('SIC Code', formData.sic_code);
