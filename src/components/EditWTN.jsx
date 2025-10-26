@@ -287,6 +287,7 @@ export default function EditWTN({ wtn, onClose, onSubmit }) {
   };
 
   const handleDownloadPDF = async () => {
+    const { default: jsPDF } = await import('jspdf')
     // Try multiple layouts to fit on 1 page
     const LAYOUTS = [
       { name: 'normal', headerSize: 14, labelSize: 8.5, valueSize: 10, sectionGap: 12, lineGap: 3, sigHeight: 30 },

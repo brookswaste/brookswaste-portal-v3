@@ -121,6 +121,7 @@ export default function DriverDashboard() {
 
   // Kept for future use (button removed in Completed Jobs)
   const handleDownloadWTN = async (jobId) => {
+    const { default: jsPDF } = await import('jspdf')
     const { data: wtn, error } = await supabase
       .from('waste_transfer_notes')
       .select('*')
