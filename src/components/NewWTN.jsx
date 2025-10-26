@@ -193,7 +193,7 @@ export default function NewWTN({ jobId, onClose, onSubmit, singleColumn = false 
     client_name: '',
     client_telephone: '',
     client_email: '',
-    client_address: '',
+    client_address: '',     // kept in state (will be left blank), not shown in UI
     site_address: '',
     vehicle_registration: '',
     waste_containment: 'Tanker',
@@ -272,13 +272,15 @@ export default function NewWTN({ jobId, onClose, onSubmit, singleColumn = false 
         .filter(Boolean)
         .join(', ')
 
+      // ✅ CHANGE: prefill Site Address only; do NOT set client_address
       setFormData((prev) => ({
         ...prev,
         date_of_service: date_of_service || '',
         customer_job_reference: customer_job_reference || '',
         client_name: customer_name || '',
         client_telephone: mobile_number || '',
-        client_address: fullAddress || '',
+        client_address: '',              // keep empty; not shown
+        site_address: fullAddress || '', // <-- put the combined address here
         job_description: job_type || '',
         driver_name: driverName || '',
       }))
@@ -323,7 +325,6 @@ export default function NewWTN({ jobId, onClose, onSubmit, singleColumn = false 
       setLoading(false);
       return;
     }
-
 
     // Fetch user
     const {
@@ -380,12 +381,13 @@ export default function NewWTN({ jobId, onClose, onSubmit, singleColumn = false 
     setLoading(false)
   }
 
+  // ✅ Client Address removed from the fields UI; only Site Address remains
   const fields = [
     { name: 'date_of_service', label: 'Date of Service', type: 'date' },
     { name: 'client_name', label: 'Client Name' },
     { name: 'client_telephone', label: 'Client Telephone' },
     { name: 'client_email', label: 'Client Email' },
-    { name: 'client_address', label: 'Client Address' },
+    // { name: 'client_address', label: 'Client Address' }, // removed from UI
     { name: 'site_address', label: 'Site Address' },
     { name: 'vehicle_registration', label: 'Vehicle Registration' },
     { name: 'waste_containment', label: 'How is the waste contained?' },

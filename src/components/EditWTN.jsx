@@ -448,7 +448,6 @@ export default function EditWTN({ wtn, onClose, onSubmit }) {
         ['Client Telephone', formData.client_telephone],
       ];
       const clientRight = [
-        ['Client Address', formData.client_address],
         ['Site Address', formData.site_address],
       ];
 
@@ -587,7 +586,6 @@ export default function EditWTN({ wtn, onClose, onSubmit }) {
     { name: 'client_name', label: 'Client Name' },
     { name: 'client_telephone', label: 'Client Telephone' },
     { name: 'client_email', label: 'Client Email' },
-    { name: 'client_address', label: 'Client Address' },
     { name: 'site_address', label: 'Site Address' },
     { name: 'vehicle_registration', label: 'Vehicle Registration' },
     { name: 'waste_containment', label: 'Waste Containment' },

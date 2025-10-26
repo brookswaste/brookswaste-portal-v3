@@ -15,6 +15,23 @@ export default function DriverDashboard() {
   const [editWTNData, setEditWTNData] = useState(null)
   const [acceptedWarning, setAcceptedWarning] = useState(false)
 
+  // 🔒 Keys to hide in BOTH sections
+  const HIDE_KEYS = new Set([
+    'id',
+    'driver_id',
+    'invoice_address',
+    'date_of_collection',
+    'portaloo_numbers',
+    'created_at',
+    'portaloo_colour',
+    'date_invoice_sent',
+    'email',
+    'job_cost_ex_vat',
+    // existing exclusions already in your code:
+    'payment_type',
+    'job_notes',
+  ])
+
   const fetchDriverJobs = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
@@ -102,9 +119,8 @@ export default function DriverDashboard() {
     setEditWTNData(wtn)
   }
 
-  // ▼ Add directly under renderBoolIcon
+  // Kept for future use (button removed in Completed Jobs)
   const handleDownloadWTN = async (jobId) => {
-    // 1) Get the latest WTN for this job
     const { data: wtn, error } = await supabase
       .from('waste_transfer_notes')
       .select('*')
@@ -118,7 +134,6 @@ export default function DriverDashboard() {
       return
     }
 
-    // 2) Helper to load images (logo & signatures)
     const loadImage = (src) =>
       new Promise((resolve, reject) => {
         if (!src) return resolve(null)
@@ -129,7 +144,6 @@ export default function DriverDashboard() {
         img.src = src
       })
 
-    // 3) Build PDF (mirrors EditWTN)
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
 
     try {
@@ -149,84 +163,56 @@ export default function DriverDashboard() {
     doc.text('01268776126 · info@brookswaste.co.uk · www.brookswaste.co.uk', 10, 26)
     doc.text('Waste Carriers Reg #: CBDU167551', 10, 31)
 
-    // --- Flexible wrapping boxes for WTN PDF ---
-    let y = 40;
-    const PAGE_LEFT = 10;
-    const PAGE_WIDTH = 190;
-    const PAGE_BOTTOM = 282;
-    const LINE_HEIGHT = 4.5;
-    const BOX_VPAD = 2.5;
-    const GAP = 2;
-    const TEXT_X = PAGE_LEFT + 2;
+    let y = 40
+    const box = (label, value) => {
+      doc.setDrawColor(100)
+      doc.setLineWidth(0.2)
+      doc.rect(10, y, 190, 8)
+      doc.setFontSize(10)
+      doc.text(`${label}: ${value ?? '-'}`, 12, y + 5)
+      y += 10
+    }
 
-    const ensureRoom = (height) => {
-      if (y + height > PAGE_BOTTOM) {
-        doc.addPage();
-        y = 40;
-      }
-    };
+    // Fields
+    box('Job ID', wtn.job_id)
+    box('Date of Service', wtn.date_of_service)
+    box('Client Name', wtn.client_name)
+    box('Client Telephone', wtn.client_telephone)
+    box('Client Email', wtn.client_email)
+    box('Client Address', wtn.client_address)
+    box('Vehicle Registration', wtn.vehicle_registration)
+    box('Waste Containment', wtn.waste_containment)
+    box('SIC Code', wtn.sic_code)
+    box('EWC', wtn.ewc)
+    box('Waste Description', wtn.waste_description)
+    box('Amount Removed', wtn.amount_removed)
+    box('Disposal Address', wtn.disposal_address)
+    box('Job Description', wtn.job_description)
+    box('Driver Name', wtn.driver_name)
+    box('Customer Name', wtn.customer_name)
 
-    const addField = (label, value) => {
-      const txt = `${label}: ${value ?? '-'}`;
-      const wrapped = doc.splitTextToSize(txt, PAGE_WIDTH - 4);
-      const boxHeight = BOX_VPAD * 2 + wrapped.length * LINE_HEIGHT;
+    // Signatures
+    y += 15
+    if (y > 250) y = 250
 
-      ensureRoom(boxHeight);
+    const signatureHeight = 30
+    const signatureWidth = 60
 
-      doc.setDrawColor(100);
-      doc.setLineWidth(0.2);
-      doc.rect(PAGE_LEFT, y, PAGE_WIDTH, boxHeight);
-
-      doc.setFontSize(10);
-      let tY = y + BOX_VPAD + LINE_HEIGHT;
-      wrapped.forEach((line, i) => {
-        doc.text(line, TEXT_X, tY + i * LINE_HEIGHT);
-      });
-
-      y += boxHeight + GAP;
-    };
-
-    // --- Fields ---
-    addField('Job ID', wtn.job_id);
-    addField('Date of Service', wtn.date_of_service);
-    addField('Client Name', wtn.client_name);
-    addField('Client Telephone', wtn.client_telephone);
-    addField('Client Email', wtn.client_email);
-    addField('Client Address', wtn.client_address);
-    addField('Vehicle Registration', wtn.vehicle_registration);
-    addField('Waste Containment', wtn.waste_containment);
-    addField('SIC Code', wtn.sic_code);
-    addField('EWC', wtn.ewc);
-    addField('Waste Description', wtn.waste_description);
-    addField('Amount Removed', wtn.amount_removed);
-    addField('Disposal Address', wtn.disposal_address);
-    addField('Job Description', wtn.job_description);
-    addField('Driver Name', wtn.driver_name);
-    addField('Customer Name', wtn.customer_name);
-
-    // --- Signatures (auto page-break aware) ---
-    const SIG_W = 60;
-    const SIG_H = 30;
-    const SIG_LABEL_H = 5;
-
-    ensureRoom(SIG_LABEL_H + SIG_H + 15);
-
-    doc.setFontSize(10);
-    doc.text('Driver Signature:', PAGE_LEFT, y);
-    doc.text('Customer Signature:', PAGE_LEFT + 100, y);
+    doc.setFontSize(10)
+    doc.text('Driver Signature:', 10, y)
+    doc.text('Customer Signature:', 110, y)
 
     try {
-      const opSig = await loadImage(wtn.operative_signature);
-      if (opSig) doc.addImage(opSig, 'PNG', PAGE_LEFT, y + 5, SIG_W, SIG_H);
+      const opSig = await loadImage(wtn.operative_signature)
+      if (opSig) doc.addImage(opSig, 'PNG', 10, y + 5, signatureWidth, signatureHeight)
     } catch (_) {}
 
     try {
-      const custSig = await loadImage(wtn.customer_signature);
-      if (custSig) doc.addImage(custSig, 'PNG', PAGE_LEFT + 100, y + 5, SIG_W, SIG_H);
+      const custSig = await loadImage(wtn.customer_signature)
+      if (custSig) doc.addImage(custSig, 'PNG', 110, y + 5, signatureWidth, signatureHeight)
     } catch (_) {}
 
-    y += SIG_H + 15;
-
+    y += signatureHeight + 15
 
     // Footer
     doc.setTextColor('#000')
@@ -319,9 +305,9 @@ export default function DriverDashboard() {
 
                   {expandedJobId === job.id && (
                     <div className="text-sm text-gray-700 mt-4 space-y-1">
-                      {/* 1) Show all standard fields except payment_type & job_notes */}
+                      {/* Hide keys in Current Jobs */}
                       {Object.entries(job).map(([key, value]) => {
-                        if (['created_at', 'driver_id', 'payment_type', 'job_notes'].includes(key)) return null
+                        if (HIDE_KEYS.has(key)) return null
                         return (
                           <p key={key}>
                             <strong>{key.replace(/_/g, ' ')}:</strong>{' '}
@@ -334,7 +320,7 @@ export default function DriverDashboard() {
                         )
                       })}
 
-                      {/* 2) Editable: Payment Type */}
+                      {/* Editable: Payment Type */}
                       <div className="mt-3">
                         <label className="block text-sm text-gray-600 font-medium mb-1">Payment Type</label>
                         <select
@@ -357,7 +343,7 @@ export default function DriverDashboard() {
                         </select>
                       </div>
 
-                      {/* 3) Editable: Job Notes (save on blur) */}
+                      {/* Editable: Job Notes (save on blur) */}
                       <div className="mt-2">
                         <label className="block text-sm text-gray-600 font-medium mb-1">Job Notes</label>
                         <textarea
@@ -431,24 +417,24 @@ export default function DriverDashboard() {
 
                   {expandedJobId === job.id && (
                     <div className="text-sm text-gray-700 mt-4 space-y-1">
-                      {Object.entries(job).map(([key, value]) => (
-                        <p key={key}>
-                          <strong>{key.replace(/_/g, ' ')}:</strong>{' '}
-                          {typeof value === 'boolean'
-                            ? renderBoolIcon(value)
-                            : value === null || value === ''
-                            ? '–'
-                            : String(value)}
-                        </p>
-                      ))}
+                      {/* Hide keys in Completed Jobs */}
+                      {Object.entries(job).map(([key, value]) => {
+                        if (HIDE_KEYS.has(key)) return null
+                        return (
+                          <p key={key}>
+                            <strong>{key.replace(/_/g, ' ')}:</strong>{' '}
+                            {typeof value === 'boolean'
+                              ? renderBoolIcon(value)
+                              : value === null || value === ''
+                              ? '–'
+                              : String(value)}
+                          </p>
+                        )
+                      })}
+
+                      {/* Only Edit WTN button */}
                       <button
-                        className="btn btn-primary btn-md text-xs bg-blue-600 hover:bg-blue-700 mt-2"
-                        onClick={() => handleDownloadWTN(job.id)}
-                      >
-                        View / Download WTN PDF
-                      </button>
-                      <button
-                        className="btn btn-primary btn-md text-xs bg-amber-500 hover:bg-amber-600 mt-2 ml-2"
+                        className="btn btn-primary btn-md text-xs bg-amber-500 hover:bg-amber-600 mt-2"
                         onClick={() => openEditWTN(job.id)}
                       >
                         Edit WTN
