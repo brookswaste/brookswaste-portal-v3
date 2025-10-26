@@ -205,173 +205,385 @@ export default function EditWTN({ wtn, onClose, onSubmit }) {
   }
 
   const handleUpdate = async () => {
-    setLoading(true)
-    const { id, ...payload } = formData
-    // Require a valid EWC selection
-    if (!payload.ewc || !EWC_OPTIONS.includes(payload.ewc)) {
+    setLoading(true);
+
+    if (!formData?.id) {
+      alert('WTN ID missing — cannot update');
+      setLoading(false);
+      return;
+    }
+
+    // Validate EWC pick
+    if (!formData.ewc || !EWC_OPTIONS.includes(formData.ewc)) {
       alert('Please select a valid EWC code.');
       setLoading(false);
       return;
     }
 
-    if (!payload.signature && sigCanvas.current && !sigCanvas.current.isEmpty()) {
-      const signatureDataUrl = sigCanvas.current.toDataURL()
-      const fileName = `signature-${uuidv4()}.png`
-      const file = await (await fetch(signatureDataUrl)).blob()
+    // Only columns that actually exist in waste_transfer_notes
+    const ALLOWED_KEYS = [
+      'job_id',
+      'created_by',
+      'client_name',
+      'client_telephone',
+      'client_email',
+      'client_address',
+      'site_address',
+      'vehicle_registration',
+      'waste_containment',
+      'sic_code',
+      'sic_other',
+      'ewc',
+      'waste_description',
+      'carrier_registration_number',
+      'amount_removed',
+      'disposal_address',
+      'job_description',
+      'portaloo_dropoff_date',
+      'portaloo_collection_date',
+      'operative_signature',
+      'driver_name',
+      'customer_signature',
+      'customer_name',
+      'time_in',
+      'time_out',
+      'date_of_service',
+      'customer_job_reference',
+      'additional_comments',
+    ];
 
-      const { error: uploadError } = await supabase.storage
-        .from('signatures')
-        .upload(`signatures/${fileName}`, file, { contentType: 'image/png' })
-
-      if (uploadError) {
-        alert('Signature upload failed')
-        console.error(uploadError)
-        setLoading(false)
-        return
-      }
-
-      const { publicUrl } = supabase.storage.from('signatures').getPublicUrl(`signatures/${fileName}`)
-      payload.signature = publicUrl
+    // Build a clean payload with only valid columns
+    const payload = {};
+    for (const key of ALLOWED_KEYS) {
+      if (key in formData) payload[key] = formData[key];
     }
 
-    Object.keys(payload).forEach(key => {
-      if (payload[key] === '') payload[key] = null
-    })
+    // Remove undefined; convert "" -> null
+    Object.keys(payload).forEach((k) => {
+      if (payload[k] === undefined) delete payload[k];
+      else if (payload[k] === '') payload[k] = null;
+    });
 
-    // Convert string to array if needed (for Supabase array fields)
-    if (typeof payload.a1_ewc_codes === 'string') {
-        payload.a1_ewc_codes = payload.a1_ewc_codes.split(',').map(item => item.trim())
-    }
-    if (typeof payload.b3_role === 'string') {
-        payload.b3_role = payload.b3_role.split(',').map(item => item.trim())
-    }
-
+    // Preserve creator if present
     if (!payload.created_by && formData.created_by) {
-      payload.created_by = formData.created_by
+      payload.created_by = formData.created_by;
     }
 
-    console.log('Submitting payload:', payload)  // ✅ ADD THIS
-
-    if (!formData?.id) {
-      alert('WTN ID missing — cannot update')
-      console.error('Missing WTN ID:', formData)
-      setLoading(false)
-      return
-    }
+    console.log('Updating with keys:', Object.keys(payload));
 
     const { error } = await supabase
       .from('waste_transfer_notes')
       .update(payload)
-      .eq('id', formData.id)
+      .eq('id', formData.id);
 
-    if (!error) {
-      onSubmit()
+    if (error) {
+      console.error('Update WTN error:', error);
+      alert('Failed to update WTN.');
     } else {
-      console.error('Update WTN error:', error)
-      alert('Failed to update WTN.')
+      onSubmit();
     }
 
-    setLoading(false)
-  }
+    setLoading(false);
+  };
 
-  const handleDownloadPDF = () => {
-    const doc = new jsPDF({
-      orientation: 'portrait',
-      unit: 'mm',
-      format: 'a4'
-    });
+  const handleDownloadPDF = async () => {
+    // Try multiple layouts to fit on 1 page
+    const LAYOUTS = [
+      { name: 'normal', headerSize: 14, labelSize: 8.5, valueSize: 10, sectionGap: 12, lineGap: 3, sigHeight: 30 },
+      { name: 'compact', headerSize: 13, labelSize: 8,   valueSize: 9.2, sectionGap: 10, lineGap: 2.5, sigHeight: 26 },
+      { name: 'ultra',   headerSize: 12, labelSize: 7.6, valueSize: 8.6, sectionGap: 9,  lineGap: 2.2, sigHeight: 22 },
+    ];
 
-    // Load and add Brooks Waste logo
-    const logoImg = new Image();
-    logoImg.src = '/images/brooks-logo.png';
-    logoImg.onload = () => {
-      doc.addImage(logoImg, 'PNG', 150, 10, 40, 0);
+    const LIGHT_PINK = '#fde2e7';
+    const TEXT = '#111111';
+    const MUTED = '#6b7280';
+    const RULE = '#e5e7eb';
 
-      // Header
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(16);
-      doc.setTextColor('#000000');
-      doc.text('Brooks Waste – Sewage Specialist', 10, 14);
+    // Synchronous helper to load an image as dataURL (optional)
+    const loadDataUrl = async (url) => {
+      try {
+        const res = await fetch(url, { cache: 'no-store' });
+        if (!res.ok) return null;
+        const blob = await res.blob();
+        return await new Promise((resolve) => {
+          const fr = new FileReader();
+          fr.onload = () => resolve(fr.result);
+          fr.readAsDataURL(blob);
+        });
+      } catch {
+        return null;
+      }
+    };
 
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
-      doc.text('Kendale The Drive, Rayleigh Essex, SS6 8XQ', 10, 19);
-      doc.text('01268776126 · info@brookswaste.co.uk · www.brookswaste.co.uk', 10, 23);
-      doc.text('Waste Carriers Reg #: CBDU167551', 10, 27);
+    const renderOnce = async (layout) => {
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
-      let y = 36;
+      // Page metrics
+      const MARGIN = 12;
+      const PAGE_W = 210;
+      const PAGE_H = 297;
+      const CONTENT_W = PAGE_W - MARGIN * 2;
+      const BOTTOM_SAFE = 287;
+      const COL_GAP = 6;
+      const COL_W = (CONTENT_W - COL_GAP) / 2;
 
-      const box = (label, value) => {
-        doc.setDrawColor(100);
-        doc.setLineWidth(0.15);
-        doc.rect(10, y, 190, 6);
-        doc.setFontSize(9);
-        doc.text(`${label}: ${value ?? '-'}`, 12, y + 4);
-        y += 7;
+      let y = MARGIN;
+
+      // Helpers
+      const line = (x1, y1, x2, y2) => {
+        doc.setDrawColor(RULE);
+        doc.setLineWidth(0.2);
+        doc.line(x1, y1, x2, y2);
+      };
+      const wouldOverflow = (needed = 20) => (y + needed > BOTTOM_SAFE);
+
+      const sectionHeader = (title) => {
+        y += 6;
+        doc.setFillColor(LIGHT_PINK);
+        doc.setTextColor('#000000');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(layout.headerSize - 2);
+        doc.rect(MARGIN, y, CONTENT_W, 8, 'F');
+        doc.text(title, MARGIN + 3, y + 5.8);
+        y += layout.sectionGap;
+        doc.setTextColor(TEXT);
       };
 
-      // New Fields
-      box('Job ID', formData.job_id);
-      box('Date of Service', formData.date_of_service);
-      box('Client Name', formData.client_name);
-      box('Client Telephone', formData.client_telephone);
-      box('Client Email', formData.client_email);
-      box('Client Address', formData.client_address);
-      box('Vehicle Registration', formData.vehicle_registration);
-      box('Waste Containment', formData.waste_containment);
-      box('SIC Code', formData.sic_code);
-      box('EWC', formData.ewc);
-      box('Waste Description', formData.waste_description);
-      box('Amount Removed', formData.amount_removed);
-      box('Disposal Address', formData.disposal_address);
-      box('Job Description', formData.job_description);
-      box('Time In', formData.time_in);
-      box('Time Out', formData.time_out);
-      box('Driver Name', formData.driver_name);
-      box('Customer Name', formData.customer_name);
-      
-      // Add padding to separate signatures from the last field box
-      y += 15;
-      
-      if (y > 250) y = 250;
+      const fitHeight = (label, value, width) => {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(layout.labelSize);
+        const lab = doc.splitTextToSize((label || '').toUpperCase(), width);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(layout.valueSize);
+        const val = doc.splitTextToSize(value || '-', width);
+        const labelBlock = lab.length * Math.max(layout.lineGap + 1.2, 3.8);
+        const valueBlock = val.length * Math.max(layout.lineGap + 1.6, 4.6);
+        return labelBlock + valueBlock + 2.5;
+      };
 
-      const signatureHeight = 30;
-      const signatureWidth = 60;
+      const drawField = (x, yStart, label, value, width) => {
+        doc.setTextColor(MUTED);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(layout.labelSize);
+        const lab = doc.splitTextToSize((label || '').toUpperCase(), width);
+        let yCursor = yStart;
+        lab.forEach((l, i) => doc.text(l, x, yCursor + 3.2 + i * (layout.lineGap + 1)));
+        yCursor += lab.length * (layout.lineGap + 1) + 1;
 
-      // Signatures section
-      doc.setFontSize(10);
-      doc.text('Driver Signature:', 10, y);
-      doc.text('Customer Signature:', 110, y);
+        doc.setTextColor(TEXT);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(layout.valueSize);
+        const val = doc.splitTextToSize(value || '-', width);
+        val.forEach((v, i) => doc.text(v, x, yCursor + 3.8 + i * (layout.lineGap + 1.4)));
+        yCursor += val.length * (layout.lineGap + 1.4) + 1.5;
+
+        line(x, yCursor + 1.1, x + width, yCursor + 1.1);
+        return yCursor + 2.2;
+      };
+
+      // === Header (always draw text first) ===
+      // Optional logo (dataURL). If it fails, we still have the header text.
+      const logoDataUrl = await loadDataUrl('/images/brooks-logo.png');
+      if (logoDataUrl) doc.addImage(logoDataUrl, 'PNG', PAGE_W - MARGIN - 36, MARGIN, 36, 0);
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(layout.headerSize);
+      doc.setTextColor(TEXT);
+      doc.text('Brooks Waste – Sewage Specialist', MARGIN, y + 6);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(MUTED);
+      doc.text('Kendale The Drive, Rayleigh Essex, SS6 8XQ', MARGIN, y + 11);
+      doc.text('01268776126 · info@brookswaste.co.uk · www.brookswaste.co.uk', MARGIN, y + 15.5);
+      doc.text('Waste Carriers Reg #: CBDU167551', MARGIN, y + 20);
+      y += 24;
+
+      // Display values
+      const displaySIC =
+        formData.sic_code === '00000 - Other: _______' ? (formData.sic_other || '') : (formData.sic_code || '');
+      const displayEWC =
+        formData.ewc === 'Other - ______________________________________'
+          ? (formData.ewc_other || 'Other (unspecified)')
+          : (formData.ewc || '');
+
+      // === Job Details (2 cols) ===
+      sectionHeader('Job Details');
+
+      let leftY = y;
+      let rightY = y;
+      const X1 = MARGIN;
+      const X2 = MARGIN + COL_W + COL_GAP;
+
+      const jobLeft = [
+        ['Date of Service', formData.date_of_service],
+        ['Customer Job Reference', formData.customer_job_reference],
+        ['Job Description', formData.job_description],
+      ];
+      const jobRight = [
+        ['Waste Containment', formData.waste_containment],
+        ['Vehicle Registration', formData.vehicle_registration],
+        ['Driver Name', formData.driver_name],
+      ];
+
+      for (const [label, value] of jobLeft) {
+        const h = fitHeight(label, value || '-', COL_W);
+        if (wouldOverflow(h)) return { doc, overflow: true };
+        leftY = drawField(X1, leftY, label, value || '-', COL_W);
+      }
+      for (const [label, value] of jobRight) {
+        const h = fitHeight(label, value || '-', COL_W);
+        if (wouldOverflow(h)) return { doc, overflow: true };
+        rightY = drawField(X2, rightY, label, value || '-', COL_W);
+      }
+      y = Math.max(leftY, rightY);
+
+      // === Client Details (2 cols) ===
+      sectionHeader('Client Details');
+      leftY = y; rightY = y;
+
+      const clientLeft = [
+        ['Client Name', formData.client_name],
+        ['Client Email', formData.client_email],
+        ['Client Telephone', formData.client_telephone],
+      ];
+      const clientRight = [
+        ['Client Address', formData.client_address],
+        ['Site Address', formData.site_address],
+      ];
+
+      for (const [label, value] of clientLeft) {
+        const h = fitHeight(label, value || '-', COL_W);
+        if (wouldOverflow(h)) return { doc, overflow: true };
+        leftY = drawField(X1, leftY, label, value || '-', COL_W);
+      }
+      for (const [label, value] of clientRight) {
+        const h = fitHeight(label, value || '-', COL_W);
+        if (wouldOverflow(h)) return { doc, overflow: true };
+        rightY = drawField(X2, rightY, label, value || '-', COL_W);
+      }
+      y = Math.max(leftY, rightY);
+
+      // === Waste Details (2 cols) ===
+      sectionHeader('Waste Details');
+      leftY = y; rightY = y;
+
+      const wasteLeft = [
+        ['SIC Code', displaySIC],
+        ['EWC Code', displayEWC],
+        ['Waste Description', formData.waste_description],
+      ];
+      const wasteRight = [
+        ['Amount Removed', formData.amount_removed],
+        ['Disposal Address', formData.disposal_address],
+      ];
+
+      for (const [label, value] of wasteLeft) {
+        const h = fitHeight(label, value || '-', COL_W);
+        if (wouldOverflow(h)) return { doc, overflow: true };
+        leftY = drawField(X1, leftY, label, value || '-', COL_W);
+      }
+      for (const [label, value] of wasteRight) {
+        const h = fitHeight(label, value || '-', COL_W);
+        if (wouldOverflow(h)) return { doc, overflow: true };
+        rightY = drawField(X2, rightY, label, value || '-', COL_W);
+      }
+      y = Math.max(leftY, rightY);
+
+      // === Signatures ===
+      sectionHeader('Signatures');
+
+      const SIG_W = (CONTENT_W - COL_GAP) / 2;
+      const SIG_H = layout.sigHeight;
+      if (wouldOverflow(SIG_H + 20)) return { doc, overflow: true };
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(MUTED);
+      doc.text('Driver Signature', MARGIN, y + 4);
+      doc.text('Customer Signature', MARGIN + SIG_W + COL_GAP, y + 4);
+
+      doc.setDrawColor(RULE);
+      doc.setLineWidth(0.2);
+      doc.rect(MARGIN, y + 6, SIG_W, SIG_H);
+      doc.rect(MARGIN + SIG_W + COL_GAP, y + 6, SIG_W, SIG_H);
 
       if (formData.operative_signature) {
-        doc.addImage(formData.operative_signature, 'PNG', 10, y + 5, signatureWidth, signatureHeight);
+        doc.addImage(formData.operative_signature, 'PNG', MARGIN + 2, y + 8, SIG_W - 4, SIG_H - 4);
       }
-
       if (formData.customer_signature) {
-        doc.addImage(formData.customer_signature, 'PNG', 110, y + 5, signatureWidth, signatureHeight);
+        doc.addImage(formData.customer_signature, 'PNG', MARGIN + SIG_W + COL_GAP + 2, y + 8, SIG_W - 4, SIG_H - 4);
       }
 
-      // Move down after signatures
-      y += signatureHeight + 15;
+      y += SIG_H + 12;
 
-      // Footer
-      doc.setTextColor('#000');
-      doc.setFontSize(7);
-      doc.text(
-        'You are signing to say you have read the above details and that they are correct and the operative has completed the job to a satisfactory standard. Brooks Waste ltd takes no responsibility for any damage done to your property where access is not suitable for a tanker. Please see our full terms and conditions on brookswaste.co.uk - Registered in England 06747484 Registered Office: 4 Chester Court, Chester Hall Lane Basildon, Essex SS14 3WR',
-        10,
-        282,
-        { maxWidth: 190 }
+      // === Additional Comments ===
+      sectionHeader('Additional Comments');
+
+      const commentsText = (formData.additional_comments || '').trim() || '-';
+
+      // Split to fit page width
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(layout.valueSize);
+      doc.setTextColor(TEXT);
+
+      const commentLines = doc.splitTextToSize(commentsText, CONTENT_W - 6);
+
+      // Compute a nice box height (min height + padding)
+      const COMMENT_LINE_H = Math.max(layout.lineGap + 1.6, 4.6);
+      const boxHeight = Math.max(
+        layout.sigHeight,                      // give it some presence
+        commentLines.length * COMMENT_LINE_H + 8 // text + padding
       );
 
-      doc.save(`WTN_Job_${formData.job_id}.pdf`);
+      // If this would overflow the page, signal overflow so the next layout tries
+      if (wouldOverflow(boxHeight + 6)) return { doc, overflow: true };
+
+      // Draw box and text
+      doc.setDrawColor(RULE);
+      doc.setLineWidth(0.2);
+      doc.rect(MARGIN, y, CONTENT_W, boxHeight);
+
+      doc.text(commentLines, MARGIN + 3, y + 6);
+      y += boxHeight + 6;
+
+      // Terms / footer
+      doc.setTextColor(MUTED);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.1);
+      const terms = doc.splitTextToSize(
+        'You are signing to say you have read the above details and that they are correct and the operative has completed the job to a satisfactory standard. Brooks Waste Ltd takes no responsibility for any damage done to your property where access is not suitable for a tanker. Please see our full terms and conditions on brookswaste.co.uk - Registered in England 06747484 Registered Office: 4 Chester Court, Chester Hall Lane Basildon, Essex SS14 3WR',
+        CONTENT_W
+      );
+      if (wouldOverflow(terms.length * 3.8 + 10)) return { doc, overflow: true };
+      doc.text(terms, MARGIN, PAGE_H - MARGIN - 8);
+
+      return { doc, overflow: false };
     };
+    
+    // Try to fit on one page by stepping through layouts
+    let finalDoc = null;
+    for (const layout of LAYOUTS) {
+      const { doc, overflow } = await renderOnce(layout);
+      if (!overflow) {
+        finalDoc = doc;
+        break;
+      }
+    }
+    if (!finalDoc) {
+      const { doc } = await renderOnce(LAYOUTS[LAYOUTS.length - 1]);
+      finalDoc = doc;
+    }
+
+    const safeRef = (formData.customer_job_reference || 'WTN').replace(/[^\w\-]+/g, '_');
+    finalDoc.save(`WTN_${safeRef}.pdf`);
   };
 
   if (!formData) return null
 
   const fields = [
     { name: 'date_of_service', label: 'Date of Service', type: 'date' },
+    { name: 'customer_job_reference', label: 'Customer Job Reference' },
     { name: 'client_name', label: 'Client Name' },
     { name: 'client_telephone', label: 'Client Telephone' },
     { name: 'client_email', label: 'Client Email' },
@@ -388,7 +600,8 @@ export default function EditWTN({ wtn, onClose, onSubmit }) {
     { name: 'time_in', label: 'Time In', type: 'time' },
     { name: 'time_out', label: 'Time Out', type: 'time' },
     { name: 'driver_name', label: 'Driver Name' },
-    { name: 'customer_name', label: 'Customer Name' }
+    { name: 'customer_name', label: 'Customer Name' },
+    { name: 'additional_comments', label: 'Additional Comments', type: 'textarea' },
   ]
 
   return (
@@ -398,10 +611,10 @@ export default function EditWTN({ wtn, onClose, onSubmit }) {
 
         <div className="grid grid-cols-2 gap-4 max-h-[65vh] overflow-y-auto pr-3">
           {fields.map(({ name, label, type }) => (
-            <div key={name}>
+            <div key={name} className={name === 'additional_comments' ? 'col-span-2' : ''}>
               <label className="text-xs text-gray-600">{label}</label>
 
-              { name === 'ewc' ? (
+              {name === 'ewc' ? (
                 <select
                   name="ewc"
                   value={formData.ewc || ''}
@@ -410,8 +623,10 @@ export default function EditWTN({ wtn, onClose, onSubmit }) {
                   className="w-full p-2 border rounded"
                 >
                   <option value="">Select EWC code…</option>
-                  {EWC_OPTIONS.map(opt => (
-                    <option key={opt} value={opt}>{opt}</option>
+                  {EWC_OPTIONS.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
                   ))}
                 </select>
               ) : name === 'disposal_address' ? (
@@ -422,27 +637,60 @@ export default function EditWTN({ wtn, onClose, onSubmit }) {
                   className="w-full p-2 border rounded"
                 >
                   <option value="">Select disposal site…</option>
-                  {DISPOSAL_ADDRESS_OPTIONS.map(opt => (
-                    <option key={opt} value={opt}>{opt}</option>
+                  {DISPOSAL_ADDRESS_OPTIONS.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
                   ))}
                 </select>
               ) : name === 'sic_code' ? (
-                <select
-                  name="sic_code"
-                  value={formData.sic_code || ''}
+                <>
+                  <select
+                    name="sic_code"
+                    value={formData.sic_code || ''}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setFormData({
+                        ...formData,
+                        sic_code: value,
+                        sic_other: value === '00000 - Other: _______' ? (formData.sic_other || '') : null,
+                      });
+                    }}
+                    className="w-full p-2 border rounded"
+                  >
+                    <option value="">Select SIC code…</option>
+                    {SIC_OPTIONS.map((opt) => {
+                      const isHeader = !/\d/.test(opt);
+                      return (
+                        <option key={opt} value={isHeader ? '' : opt} disabled={isHeader}>
+                          {opt}
+                        </option>
+                      );
+                    })}
+                  </select>
+
+                  {formData.sic_code === '00000 - Other: _______' && (
+                    <div className="mt-2">
+                      <label className="text-xs text-gray-600">Custom SIC description</label>
+                      <input
+                        type="text"
+                        name="sic_other"
+                        value={formData.sic_other || ''}
+                        onChange={(e) => setFormData({ ...formData, sic_other: e.target.value })}
+                        placeholder="Type your custom SIC code or description"
+                        className="w-full p-2 border rounded"
+                      />
+                    </div>
+                  )}
+                </>
+              ) : type === 'textarea' ? (
+                <textarea
+                  name={name}
+                  value={formData[name] || ''}
                   onChange={handleChange}
-                  className="w-full p-2 border rounded"
-                >
-                  <option value="">Select SIC code…</option>
-                  {SIC_OPTIONS.map(opt => {
-                    const isHeader = !/\d/.test(opt); // category header if no digits
-                    return (
-                      <option key={opt} value={isHeader ? '' : opt} disabled={isHeader}>
-                        {opt}
-                      </option>
-                    )
-                  })}
-                </select>
+                  className="w-full p-2 border rounded min-h-[110px]"
+                  placeholder={name === 'additional_comments' ? 'Add any extra notes for this WTN…' : ''}
+                />
               ) : type === 'checkbox' ? (
                 <input
                   type="checkbox"

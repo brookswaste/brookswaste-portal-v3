@@ -188,6 +188,7 @@ const DISPOSAL_ADDRESS_OPTIONS = [
 export default function NewWTN({ jobId, onClose, onSubmit, singleColumn = false }) {
   const [formData, setFormData] = useState({
     job_id: jobId,
+    customer_job_reference: '',
     date_of_service: '',
     client_name: '',
     client_telephone: '',
@@ -197,6 +198,7 @@ export default function NewWTN({ jobId, onClose, onSubmit, singleColumn = false 
     vehicle_registration: '',
     waste_containment: 'Tanker',
     sic_code: '',
+    sic_other: '',
     ewc: '',
     waste_description: '',
     amount_removed: '',
@@ -208,6 +210,7 @@ export default function NewWTN({ jobId, onClose, onSubmit, singleColumn = false 
     driver_name: '',
     customer_signature: '',
     customer_name: '',
+    additional_comments: '',
   })
 
   const [loading, setLoading] = useState(false)
@@ -256,6 +259,8 @@ export default function NewWTN({ jobId, onClose, onSubmit, singleColumn = false 
         date_of_service,
       } = job
 
+      const { customer_job_reference } = job;
+
       const fullAddress = [
         company_name,
         address_line_1,
@@ -270,6 +275,7 @@ export default function NewWTN({ jobId, onClose, onSubmit, singleColumn = false 
       setFormData((prev) => ({
         ...prev,
         date_of_service: date_of_service || '',
+        customer_job_reference: customer_job_reference || '',
         client_name: customer_name || '',
         client_telephone: mobile_number || '',
         client_address: fullAddress || '',
@@ -359,6 +365,9 @@ export default function NewWTN({ jobId, onClose, onSubmit, singleColumn = false 
       if (payload[key] === '') payload[key] = null
     })
 
+    payload.sic_code = formData.sic_code;
+    payload.sic_other = formData.sic_other;
+
     const { error } = await supabase.from('waste_transfer_notes').insert([payload])
 
     if (!error) {
@@ -386,10 +395,12 @@ export default function NewWTN({ jobId, onClose, onSubmit, singleColumn = false 
     { name: 'amount_removed', label: 'Amount of Waste Removed' },
     { name: 'disposal_address', label: 'Disposal Address' },
     { name: 'job_description', label: 'Job Description' },
+    { name: 'additional_comments', label: 'Additional Comments', type: 'textarea' },
     { name: 'time_in', label: 'Time In', type: 'time' },
     { name: 'time_out', label: 'Time Out', type: 'time' },
     { name: 'driver_name', label: 'Driver Name' },
     { name: 'customer_name', label: 'Customer Name' },
+    { name: 'additional_comments', label: 'Additional Comments', type: 'textarea' },
   ]
 
   return (
@@ -401,10 +412,10 @@ export default function NewWTN({ jobId, onClose, onSubmit, singleColumn = false 
           className={`grid ${singleColumn ? 'grid-cols-1' : 'grid-cols-2'} gap-4 max-h-[60vh] overflow-y-auto pr-3`}
         >
           {fields.map(({ name, label, type }) => (
-            <div key={name}>
+            <div key={name} className={name === 'additional_comments' && !singleColumn ? 'col-span-2' : ''}>
               <label className="text-xs text-gray-600">{label}</label>
 
-              { name === 'ewc' ? (
+              {name === 'ewc' ? (
                 <select
                   name="ewc"
                   value={formData.ewc || ''}
@@ -413,27 +424,50 @@ export default function NewWTN({ jobId, onClose, onSubmit, singleColumn = false 
                   className="w-full p-2 border rounded"
                 >
                   <option value="">Select EWC code…</option>
-                  {EWC_OPTIONS.map(opt => (
+                  {EWC_OPTIONS.map((opt) => (
                     <option key={opt} value={opt}>{opt}</option>
                   ))}
                 </select>
               ) : name === 'sic_code' ? (
-                <select
-                  name="sic_code"
-                  value={formData.sic_code || ''}
-                  onChange={handleChange}
-                  className="w-full p-2 border rounded"
-                >
-                  <option value="">Select SIC code…</option>
-                  {SIC_OPTIONS.map(opt => {
-                    const isHeader = !/\d/.test(opt); // category header if no digits
-                    return (
-                      <option key={opt} value={isHeader ? '' : opt} disabled={isHeader}>
-                        {opt}
-                      </option>
-                    )
-                  })}
-                </select>
+                <React.Fragment>
+                  <select
+                    name="sic_code"
+                    value={formData.sic_code || ''}
+                    onChange={(e) => {
+                      const value = e.target.value
+                      setFormData((prev) => ({
+                        ...prev,
+                        sic_code: value,
+                        sic_other: value === '00000 - Other: _______' ? '' : null,
+                      }))
+                    }}
+                    className="w-full p-2 border rounded"
+                  >
+                    <option value="">Select SIC code…</option>
+                    {SIC_OPTIONS.map((opt) => {
+                      const isHeader = !/\d/.test(opt)
+                      return (
+                        <option key={opt} value={isHeader ? '' : opt} disabled={isHeader}>
+                          {opt}
+                        </option>
+                      )
+                    })}
+                  </select>
+
+                  {formData.sic_code === '00000 - Other: _______' && (
+                    <div className="mt-2">
+                      <label className="text-xs text-gray-600">Custom SIC description</label>
+                      <input
+                        type="text"
+                        name="sic_other"
+                        value={formData.sic_other || ''}
+                        onChange={(e) => setFormData((prev) => ({ ...prev, sic_other: e.target.value }))}
+                        placeholder="Type your custom SIC code or description"
+                        className="w-full p-2 border rounded"
+                      />
+                    </div>
+                  )}
+                </React.Fragment>
               ) : name === 'disposal_address' ? (
                 <select
                   name="disposal_address"
@@ -442,10 +476,18 @@ export default function NewWTN({ jobId, onClose, onSubmit, singleColumn = false 
                   className="w-full p-2 border rounded"
                 >
                   <option value="">Select disposal site…</option>
-                  {DISPOSAL_ADDRESS_OPTIONS.map(opt => (
+                  {DISPOSAL_ADDRESS_OPTIONS.map((opt) => (
                     <option key={opt} value={opt}>{opt}</option>
                   ))}
                 </select>
+              ) : type === 'textarea' ? (
+                <textarea
+                  name={name}
+                  value={formData[name] || ''}
+                  onChange={handleChange}
+                  className="w-full p-2 border rounded min-h-[110px]"
+                  placeholder="Add any extra notes for this WTN…"
+                />
               ) : (
                 <input
                   type={type || 'text'}

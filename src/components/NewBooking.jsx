@@ -4,6 +4,7 @@ import { supabase } from '../supabaseClient'
 export function NewBookingModal({ onClose, onSave }) {
   const [formData, setFormData] = useState({
     job_type: '',
+    customer_job_reference: '',
     customer_name: '',
     company_name: '',
     address_line_1: '',
@@ -85,6 +86,7 @@ export function NewBookingModal({ onClose, onSave }) {
 
   const fields = [
     { name: 'job_type', label: 'Job Type *', type: 'jobTypeDropdown' },
+    { name: 'customer_job_reference', label: 'Customer Job Reference' },
     { name: 'customer_name', label: 'Customer Name *' },
     { name: 'company_name', label: 'Company Name' },
     { name: 'address_line_1', label: 'Address Line 1 *' },
@@ -97,7 +99,7 @@ export function NewBookingModal({ onClose, onSave }) {
     { name: 'email', label: 'Email', type: 'email' },
     { name: 'date_of_service', label: 'Date of Service *', type: 'date' },
     { name: 'driver_id', label: 'Assigned Driver *', type: 'dropdown' },
-    { name: 'invoice_address', label: 'Invoice Address' },
+    { name: 'invoice_address', label: 'Invoice Address (if different than customer address)' },
     { name: 'job_cost_ex_vat', label: 'Job Cost ex VAT' },
     { name: 'job_cost_inc_vat', label: 'Job Cost inc VAT' },
     { name: 'date_of_collection', label: 'Date of Collection', type: 'date' },

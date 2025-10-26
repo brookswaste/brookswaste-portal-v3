@@ -149,56 +149,84 @@ export default function DriverDashboard() {
     doc.text('01268776126 · info@brookswaste.co.uk · www.brookswaste.co.uk', 10, 26)
     doc.text('Waste Carriers Reg #: CBDU167551', 10, 31)
 
-    let y = 40
-    const box = (label, value) => {
-      doc.setDrawColor(100)
-      doc.setLineWidth(0.2)
-      doc.rect(10, y, 190, 8)
-      doc.setFontSize(10)
-      doc.text(`${label}: ${value ?? '-'}`, 12, y + 5)
-      y += 10
-    }
+    // --- Flexible wrapping boxes for WTN PDF ---
+    let y = 40;
+    const PAGE_LEFT = 10;
+    const PAGE_WIDTH = 190;
+    const PAGE_BOTTOM = 282;
+    const LINE_HEIGHT = 4.5;
+    const BOX_VPAD = 2.5;
+    const GAP = 2;
+    const TEXT_X = PAGE_LEFT + 2;
 
-    // Same fields as EditWTN
-    box('Job ID', wtn.job_id)
-    box('Date of Service', wtn.date_of_service)
-    box('Client Name', wtn.client_name)
-    box('Client Telephone', wtn.client_telephone)
-    box('Client Email', wtn.client_email)
-    box('Client Address', wtn.client_address)
-    box('Vehicle Registration', wtn.vehicle_registration)
-    box('Waste Containment', wtn.waste_containment)
-    box('SIC Code', wtn.sic_code)
-    box('EWC', wtn.ewc)
-    box('Waste Description', wtn.waste_description)
-    box('Amount Removed', wtn.amount_removed)
-    box('Disposal Address', wtn.disposal_address)
-    box('Job Description', wtn.job_description)
-    box('Driver Name', wtn.driver_name)
-    box('Customer Name', wtn.customer_name)
+    const ensureRoom = (height) => {
+      if (y + height > PAGE_BOTTOM) {
+        doc.addPage();
+        y = 40;
+      }
+    };
 
-    // Signatures
-    y += 15
-    if (y > 250) y = 250
+    const addField = (label, value) => {
+      const txt = `${label}: ${value ?? '-'}`;
+      const wrapped = doc.splitTextToSize(txt, PAGE_WIDTH - 4);
+      const boxHeight = BOX_VPAD * 2 + wrapped.length * LINE_HEIGHT;
 
-    const signatureHeight = 30
-    const signatureWidth = 60
+      ensureRoom(boxHeight);
 
-    doc.setFontSize(10)
-    doc.text('Driver Signature:', 10, y)
-    doc.text('Customer Signature:', 110, y)
+      doc.setDrawColor(100);
+      doc.setLineWidth(0.2);
+      doc.rect(PAGE_LEFT, y, PAGE_WIDTH, boxHeight);
+
+      doc.setFontSize(10);
+      let tY = y + BOX_VPAD + LINE_HEIGHT;
+      wrapped.forEach((line, i) => {
+        doc.text(line, TEXT_X, tY + i * LINE_HEIGHT);
+      });
+
+      y += boxHeight + GAP;
+    };
+
+    // --- Fields ---
+    addField('Job ID', wtn.job_id);
+    addField('Date of Service', wtn.date_of_service);
+    addField('Client Name', wtn.client_name);
+    addField('Client Telephone', wtn.client_telephone);
+    addField('Client Email', wtn.client_email);
+    addField('Client Address', wtn.client_address);
+    addField('Vehicle Registration', wtn.vehicle_registration);
+    addField('Waste Containment', wtn.waste_containment);
+    addField('SIC Code', wtn.sic_code);
+    addField('EWC', wtn.ewc);
+    addField('Waste Description', wtn.waste_description);
+    addField('Amount Removed', wtn.amount_removed);
+    addField('Disposal Address', wtn.disposal_address);
+    addField('Job Description', wtn.job_description);
+    addField('Driver Name', wtn.driver_name);
+    addField('Customer Name', wtn.customer_name);
+
+    // --- Signatures (auto page-break aware) ---
+    const SIG_W = 60;
+    const SIG_H = 30;
+    const SIG_LABEL_H = 5;
+
+    ensureRoom(SIG_LABEL_H + SIG_H + 15);
+
+    doc.setFontSize(10);
+    doc.text('Driver Signature:', PAGE_LEFT, y);
+    doc.text('Customer Signature:', PAGE_LEFT + 100, y);
 
     try {
-      const opSig = await loadImage(wtn.operative_signature)
-      if (opSig) doc.addImage(opSig, 'PNG', 10, y + 5, signatureWidth, signatureHeight)
+      const opSig = await loadImage(wtn.operative_signature);
+      if (opSig) doc.addImage(opSig, 'PNG', PAGE_LEFT, y + 5, SIG_W, SIG_H);
     } catch (_) {}
 
     try {
-      const custSig = await loadImage(wtn.customer_signature)
-      if (custSig) doc.addImage(custSig, 'PNG', 110, y + 5, signatureWidth, signatureHeight)
+      const custSig = await loadImage(wtn.customer_signature);
+      if (custSig) doc.addImage(custSig, 'PNG', PAGE_LEFT + 100, y + 5, SIG_W, SIG_H);
     } catch (_) {}
 
-    y += signatureHeight + 15
+    y += SIG_H + 15;
+
 
     // Footer
     doc.setTextColor('#000')
