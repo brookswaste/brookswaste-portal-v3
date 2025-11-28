@@ -1,8 +1,7 @@
-import React, { useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import SignatureCanvas from 'react-signature-canvas'
 import { supabase } from '../supabaseClient'
 import { v4 as uuidv4 } from 'uuid'
-import { useEffect } from 'react' // Make sure this is at the top
 
 const EWC_OPTIONS = [
   '13 05 – Oil/Water Separator Contents',
@@ -38,7 +37,31 @@ const EWC_OPTIONS = [
   '20 03 03 - Street Cleaning Residues (Gully Waste)',
   '20 03 04 - Septic Tank Sludge',
   '20 03 06 - Waste from Sewage Cleaning',
-  '20 03 99 - Municipal Waste Not Otherwise Specified'
+  '20 03 99 - Municipal Waste Not Otherwise Specified',
+  'Other - ______________________________________',
+];
+
+const VEHICLE_REGISTRATION_OPTIONS = [
+  'WX07 TVD',
+  'CE55 PET',
+  'HX12 NNT',
+  'PN09 JPY',
+  'PO06 EAN',
+  'PO05 TOM',
+  'GD07 CZN',
+  'HX14 WDL',
+  'YJ57 FMM',
+  'PO05 DNO',
+  'BX64 BWL',
+  'RK66 PYV',
+  'RK66 PZN',
+  'TO11 LTS',
+  'OU12 ZJV',
+  'GH16 MVT',
+  'LE71 LOO',
+  'WF61 WVU',
+  'EF15 ZBY',
+  'Other – ___________________________'
 ];
 
 // ▼ SIC: categories are shown as disabled "headers"
@@ -196,10 +219,12 @@ export default function NewWTN({ jobId, onClose, onSubmit, singleColumn = false 
     client_address: '',     // kept in state (will be left blank), not shown in UI
     site_address: '',
     vehicle_registration: '',
+    vehicle_registration_other: '',
     waste_containment: 'Tanker',
     sic_code: '',
     sic_other: '',
     ewc: '',
+    ewc_other: '',
     waste_description: '',
     amount_removed: '',
     disposal_address: '',
@@ -318,8 +343,70 @@ export default function NewWTN({ jobId, onClose, onSubmit, singleColumn = false 
   }
 
   const handleSubmit = async () => {
+    // 🔹 Required field validation BEFORE saving
+    const missing = []
+
+    const requiredText = [
+      ["client_name", "Client Name"],
+      ["site_address", "Site Address"],
+      ["vehicle_registration", "Vehicle Registration"],
+      ["sic_code", "SIC Code"],
+      ["ewc", "EWC"],
+      ["waste_description", "Waste Description"],
+      ["amount_removed", "Amount Removed"],
+      ["disposal_address", "Disposal Address"],
+      ["job_description", "Job Description"],
+      ["time_in", "Time In"],
+      ["time_out", "Time Out"],
+      ["driver_name", "Driver Name"],
+      ["customer_name", "Customer Name"],
+    ]
+
+    requiredText.forEach(([key, label]) => {
+      if (!formData[key] || String(formData[key]).trim() === "") {
+        missing.push(label)
+      }
+    })
+
+    // 🔹 Signatures: either already saved in formData OR drawn on canvas
+    const operativeMissing =
+      !formData.operative_signature &&
+      (!operativeSigCanvas.current || operativeSigCanvas.current.isEmpty())
+
+    const customerMissing =
+      !formData.customer_signature &&
+      (!customerSigCanvas.current || customerSigCanvas.current.isEmpty())
+
+    if (operativeMissing) missing.push("Driver Signature")
+    if (customerMissing) missing.push("Customer Signature")
+
+    if (missing.length > 0) {
+      alert(
+        "Please complete all required fields before saving this WTN:\n\n" +
+          missing.map((f) => `• ${f}`).join("\n")
+      )
+      return // ⛔ Stop here, don't save
+    }
     setLoading(true)
     const payload = { ...formData }
+
+    // If EWC is "Other", save custom text into ewc; do not send helper field
+    if (
+      payload.ewc === 'Other - ______________________________________' &&
+      payload.ewc_other
+    ) {
+      payload.ewc = payload.ewc_other.trim()
+    }
+    delete payload.ewc_other
+    // If "Other" was selected, use the custom value
+    if (
+      payload.vehicle_registration === 'Other – ___________________________' &&
+      payload.vehicle_registration_other
+    ) {
+      payload.vehicle_registration = payload.vehicle_registration_other.trim()
+    }
+    // Do not send helper field to Supabase
+    delete payload.vehicle_registration_other
     if (!payload.ewc) {
       alert('Please select an EWC code.');
       setLoading(false);
@@ -369,6 +456,15 @@ export default function NewWTN({ jobId, onClose, onSubmit, singleColumn = false 
     payload.sic_code = formData.sic_code;
     payload.sic_other = formData.sic_other;
 
+    // If EWC is "Other", save custom text into ewc; do not send helper field
+    if (
+      formData.ewc === 'Other - ______________________________________' &&
+      formData.ewc_other
+    ) {
+      payload.ewc = String(formData.ewc_other).trim()
+    }
+    delete payload.ewc_other
+
     const { error } = await supabase.from('waste_transfer_notes').insert([payload])
 
     if (!error) {
@@ -402,7 +498,6 @@ export default function NewWTN({ jobId, onClose, onSubmit, singleColumn = false 
     { name: 'time_out', label: 'Time Out', type: 'time' },
     { name: 'driver_name', label: 'Driver Name' },
     { name: 'customer_name', label: 'Customer Name' },
-    { name: 'additional_comments', label: 'Additional Comments', type: 'textarea' },
   ]
 
   return (
@@ -417,19 +512,35 @@ export default function NewWTN({ jobId, onClose, onSubmit, singleColumn = false 
             <div key={name} className={name === 'additional_comments' && !singleColumn ? 'col-span-2' : ''}>
               <label className="text-xs text-gray-600">{label}</label>
 
-              {name === 'ewc' ? (
-                <select
-                  name="ewc"
-                  value={formData.ewc || ''}
-                  onChange={handleChange}
-                  required
-                  className="w-full p-2 border rounded"
-                >
-                  <option value="">Select EWC code…</option>
-                  {EWC_OPTIONS.map((opt) => (
-                    <option key={opt} value={opt}>{opt}</option>
-                  ))}
-                </select>
+              { name === 'ewc' ? (
+                <>
+                  <select
+                    name="ewc"
+                    value={formData.ewc || ''}
+                    onChange={handleChange}
+                    required
+                    className="w-full p-2 border rounded"
+                  >
+                    <option value="">Select EWC code…</option>
+                    {EWC_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+
+                  {formData.ewc === 'Other - ______________________________________' && (
+                    <div className="mt-2">
+                      <label className="text-xs text-gray-600">Custom EWC Code/Description</label>
+                      <input
+                        type="text"
+                        name="ewc_other"
+                        value={formData.ewc_other || ''}
+                        onChange={(e) => setFormData((prev) => ({ ...prev, ewc_other: e.target.value }))}
+                        placeholder="Enter custom EWC"
+                        className="w-full p-2 border rounded"
+                      />
+                    </div>
+                  )}
+                </>
               ) : name === 'sic_code' ? (
                 <React.Fragment>
                   <select
@@ -482,6 +593,36 @@ export default function NewWTN({ jobId, onClose, onSubmit, singleColumn = false 
                     <option key={opt} value={opt}>{opt}</option>
                   ))}
                 </select>
+              ) : name === 'vehicle_registration' ? (
+                <>
+                  <select
+                    name="vehicle_registration"
+                    value={formData.vehicle_registration || ''}
+                    onChange={handleChange}
+                    className="w-full p-2 border rounded"
+                  >
+                    <option value="">Select vehicle…</option>
+                    {VEHICLE_REGISTRATION_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+
+                  {formData.vehicle_registration === 'Other – ___________________________' && (
+                    <div className="mt-2">
+                      <label className="text-xs text-gray-600">Custom Vehicle Registration</label>
+                      <input
+                        type="text"
+                        name="vehicle_registration_other"
+                        value={formData.vehicle_registration_other || ''}
+                        onChange={(e) =>
+                          setFormData((prev) => ({ ...prev, vehicle_registration_other: e.target.value }))
+                        }
+                        placeholder="Enter custom vehicle registration"
+                        className="w-full p-2 border rounded"
+                      />
+                    </div>
+                  )}
+                </>
               ) : type === 'textarea' ? (
                 <textarea
                   name={name}

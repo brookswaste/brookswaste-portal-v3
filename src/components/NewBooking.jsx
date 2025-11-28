@@ -193,6 +193,7 @@ export function NewBookingModal({ onClose, onSave }) {
                   <option value="Cheque">Cheque</option>
                   <option value="BACS">BACS</option>
                   <option value="SumUp">SumUp</option>
+                  <option value="EOM Account">EOM Account</option>
                   <option value="TBD">TBD</option>
                 </select>
               ) : type === 'checkbox' ? (

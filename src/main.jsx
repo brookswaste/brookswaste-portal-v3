@@ -5,10 +5,8 @@ import App from './App.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import DriverDashboard from './pages/DriverDashboard.jsx'
 import AdminDashboard from './pages/AdminDashboard.jsx'
-import PortalooManager from './pages/PortalooManager.jsx'
 import Bookings from './pages/Bookings.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
-import Layout from './components/Layout.jsx'
 import Todo from './pages/Todo.jsx'
 import './index.css'
 
@@ -16,57 +14,53 @@ ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter>
       <Routes>
-        {/* Login stays outside the layout */}
+
+        {/* Login */}
         <Route path="/" element={<LoginPage />} />
 
-        {/* All pages wrapped in Layout */}
-        <Route element={<Layout />}>
-          <Route
-            path="/driver-dashboard"
-            element={
-              <ProtectedRoute adminOnly={false}>
-                <DriverDashboard />
-              </ProtectedRoute>
-            }
-          />
+        {/* Driver Dashboard */}
+        <Route
+          path="/driver-dashboard"
+          element={
+            <ProtectedRoute adminOnly={false}>
+              <DriverDashboard />
+            </ProtectedRoute>
+          }
+        />
 
-          <Route
-            path="/admin-dashboard"
-            element={
-              <ProtectedRoute adminOnly={true}>
-                <AdminDashboard />
-              </ProtectedRoute>
-            }
-          />
+        {/* Admin Dashboard */}
+        <Route
+          path="/admin-dashboard"
+          element={
+            <ProtectedRoute adminOnly={true}>
+              <AdminDashboard />
+            </ProtectedRoute>
+          }
+        />
 
-          <Route
-            path="/portaloo-manager"
-            element={
-              <ProtectedRoute adminOnly={true}>
-                <PortalooManager />
-              </ProtectedRoute>
-            }
-          />
+        {/* Bookings */}
+        <Route
+          path="/bookings"
+          element={
+            <ProtectedRoute adminOnly={true}>
+              <Bookings />
+            </ProtectedRoute>
+          }
+        />
 
-          <Route
-            path="/bookings"
-            element={
-              <ProtectedRoute adminOnly={true}>
-                <Bookings />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/todo"
-            element={
-              <ProtectedRoute adminOnly={true}>
-                <Todo />
-              </ProtectedRoute>
-            }
-          />
-        </Route>
+        {/* To-Do Page */}
+        <Route
+          path="/todo"
+          element={
+            <ProtectedRoute adminOnly={true}>
+              <Todo />
+            </ProtectedRoute>
+          }
+        />
 
+        {/* Fallback */}
         <Route path="*" element={<App />} />
+
       </Routes>
     </BrowserRouter>
   </React.StrictMode>

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import NewWTN from '../components/NewWTN'
 import EditWTN from '../components/EditWTN'
+import generateWTNPDF from '../utils/generateWTNPDF'
 import jsPDF from 'jspdf'
 
 export default function DriverDashboard() {
@@ -27,7 +28,6 @@ export default function DriverDashboard() {
     'date_invoice_sent',
     'email',
     'job_cost_ex_vat',
-    // existing exclusions already in your code:
     'payment_type',
     'job_notes',
   ])
@@ -45,10 +45,8 @@ export default function DriverDashboard() {
     if (!driver) return
     setName(driver.name)
 
-    // Get today in YYYY-MM-DD format
     const todayStr = new Date().toISOString().split('T')[0]
 
-    // Active jobs for today
     const { data: activeJobs } = await supabase
       .from('jobs')
       .select('*')
@@ -110,7 +108,6 @@ export default function DriverDashboard() {
       return
     }
 
-    // If no WTN exists yet, fall back to creating one
     if (!wtn) {
       setShowWTNModalForJob(jobId)
       return
@@ -119,9 +116,7 @@ export default function DriverDashboard() {
     setEditWTNData(wtn)
   }
 
-  // Kept for future use (button removed in Completed Jobs)
   const handleDownloadWTN = async (jobId) => {
-    const { default: jsPDF } = await import('jspdf')
     const { data: wtn, error } = await supabase
       .from('waste_transfer_notes')
       .select('*')
@@ -135,101 +130,10 @@ export default function DriverDashboard() {
       return
     }
 
-    const loadImage = (src) =>
-      new Promise((resolve, reject) => {
-        if (!src) return resolve(null)
-        const img = new Image()
-        img.crossOrigin = 'anonymous'
-        img.onload = () => resolve(img)
-        img.onerror = reject
-        img.src = src
-      })
+    generateWTNPDF(wtn)
+  }
 
-    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
-
-    try {
-      const logoImg = await loadImage('/images/brooks-logo.png')
-      if (logoImg) doc.addImage(logoImg, 'PNG', 150, 10, 40, 0)
-    } catch (_) {}
-
-    // Header
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(18)
-    doc.setTextColor('#000000')
-    doc.text('Brooks Waste – Sewage Specialist', 10, 15)
-
-    doc.setFontSize(10)
-    doc.setFont('helvetica', 'normal')
-    doc.text('Kendale The Drive, Rayleigh Essex, SS6 8XQ', 10, 21)
-    doc.text('01268776126 · info@brookswaste.co.uk · www.brookswaste.co.uk', 10, 26)
-    doc.text('Waste Carriers Reg #: CBDU167551', 10, 31)
-
-    let y = 40
-    const box = (label, value) => {
-      doc.setDrawColor(100)
-      doc.setLineWidth(0.2)
-      doc.rect(10, y, 190, 8)
-      doc.setFontSize(10)
-      doc.text(`${label}: ${value ?? '-'}`, 12, y + 5)
-      y += 10
-    }
-
-    // Fields
-    box('Job ID', wtn.job_id)
-    box('Date of Service', wtn.date_of_service)
-    box('Client Name', wtn.client_name)
-    box('Client Telephone', wtn.client_telephone)
-    box('Client Email', wtn.client_email)
-    box('Client Address', wtn.client_address)
-    box('Vehicle Registration', wtn.vehicle_registration)
-    box('Waste Containment', wtn.waste_containment)
-    box('SIC Code', wtn.sic_code)
-    box('EWC', wtn.ewc)
-    box('Waste Description', wtn.waste_description)
-    box('Amount Removed', wtn.amount_removed)
-    box('Disposal Address', wtn.disposal_address)
-    box('Job Description', wtn.job_description)
-    box('Driver Name', wtn.driver_name)
-    box('Customer Name', wtn.customer_name)
-
-    // Signatures
-    y += 15
-    if (y > 250) y = 250
-
-    const signatureHeight = 30
-    const signatureWidth = 60
-
-    doc.setFontSize(10)
-    doc.text('Driver Signature:', 10, y)
-    doc.text('Customer Signature:', 110, y)
-
-    try {
-      const opSig = await loadImage(wtn.operative_signature)
-      if (opSig) doc.addImage(opSig, 'PNG', 10, y + 5, signatureWidth, signatureHeight)
-    } catch (_) {}
-
-    try {
-      const custSig = await loadImage(wtn.customer_signature)
-      if (custSig) doc.addImage(custSig, 'PNG', 110, y + 5, signatureWidth, signatureHeight)
-    } catch (_) {}
-
-    y += signatureHeight + 15
-
-    // Footer
-    doc.setTextColor('#000')
-    doc.setFontSize(7)
-    doc.text(
-      'You are signing to say you have read the above details and that they are correct and the operative has completed the job to a satisfactory standard. Brooks Waste ltd takes no responsibility for any damage done to your property where access is not suitable for a tanker. Please see our full terms and conditions on brookswaste.co.uk - Registered in England 06747484 Registered Office: 4 Chester Court, Chester Hall Lane Basildon, Essex SS14 3WR',
-      10,
-      282,
-      { maxWidth: 190 }
-    )
-
-    doc.save(`WTN_Job_${wtn.job_id}.pdf`)
-  } // ← closes handleDownloadWTN
-
-
-  // Safety popup — block dashboard until confirmed
+  // Safety popup
   if (!acceptedWarning) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
@@ -247,12 +151,7 @@ export default function DriverDashboard() {
             <li>You are not in control of a moving vehicle.</li>
             <li>You accept full responsibility for complying with road safety laws.</li>
           </ul>
-          <p className="mb-3">
-            Failure to comply may result in disciplinary action.
-          </p>
-          <p className="mb-6">
-            Click <strong>“Confirm”</strong> only if you are fully stationary.
-          </p>
+          <p className="mb-6">Failure to comply may result in disciplinary action.</p>
           <button
             onClick={() => setAcceptedWarning(true)}
             className="btn btn-primary btn-md px-6 py-2"
@@ -306,7 +205,6 @@ export default function DriverDashboard() {
 
                   {expandedJobId === job.id && (
                     <div className="text-sm text-gray-700 mt-4 space-y-1">
-                      {/* Hide keys in Current Jobs */}
                       {Object.entries(job).map(([key, value]) => {
                         if (HIDE_KEYS.has(key)) return null
                         return (
@@ -321,7 +219,7 @@ export default function DriverDashboard() {
                         )
                       })}
 
-                      {/* Editable: Payment Type */}
+                      {/* Payment Type */}
                       <div className="mt-3">
                         <label className="block text-sm text-gray-600 font-medium mb-1">Payment Type</label>
                         <select
@@ -344,7 +242,7 @@ export default function DriverDashboard() {
                         </select>
                       </div>
 
-                      {/* Editable: Job Notes (save on blur) */}
+                      {/* Job Notes */}
                       <div className="mt-2">
                         <label className="block text-sm text-gray-600 font-medium mb-1">Job Notes</label>
                         <textarea
@@ -357,7 +255,6 @@ export default function DriverDashboard() {
                         />
                       </div>
 
-                      {/* WTN + Complete Logic */}
                       {!job.waste_transfer_note_complete ? (
                         <button
                           className="btn btn-primary btn-md text-xs bg-yellow-500 hover:bg-yellow-600 mt-2"
@@ -374,7 +271,6 @@ export default function DriverDashboard() {
                         </button>
                       )}
 
-                      {/* Mark as Paid */}
                       {!job.paid && (
                         <button
                           className="btn btn-primary btn-md text-xs bg-lime-400 hover:bg-lime-500 mt-2 ml-2"
@@ -418,7 +314,6 @@ export default function DriverDashboard() {
 
                   {expandedJobId === job.id && (
                     <div className="text-sm text-gray-700 mt-4 space-y-1">
-                      {/* Hide keys in Completed Jobs */}
                       {Object.entries(job).map(([key, value]) => {
                         if (HIDE_KEYS.has(key)) return null
                         return (
@@ -433,7 +328,6 @@ export default function DriverDashboard() {
                         )
                       })}
 
-                      {/* Only Edit WTN button */}
                       <button
                         className="btn btn-primary btn-md text-xs bg-amber-500 hover:bg-amber-600 mt-2"
                         onClick={() => openEditWTN(job.id)}
@@ -452,7 +346,7 @@ export default function DriverDashboard() {
       {showWTNModalForJob && (
         <NewWTN
           jobId={showWTNModalForJob}
-          singleColumn   // ← force 1 field per row for drivers
+          singleColumn
           onClose={() => setShowWTNModalForJob(null)}
           onSubmit={() => {
             setShowWTNModalForJob(null)
@@ -460,7 +354,7 @@ export default function DriverDashboard() {
           }}
         />
       )}
-      
+
       {editWTNData && (
         <EditWTN
           wtn={editWTNData}

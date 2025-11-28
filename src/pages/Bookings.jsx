@@ -9,7 +9,7 @@ import {
 } from '../components/BookingsModals'
 import NewWTN from '../components/NewWTN'
 import EditWTN from '../components/EditWTN'
-import jsPDF from 'jspdf'
+import generateWTNPDF from '../utils/generateWTNPDF'
 
 export default function Bookings() {
   const [jobs, setJobs] = useState([])
@@ -117,7 +117,6 @@ export default function Bookings() {
       setActiveModal('createWtn')
     }
   }
-
   const handleArchive = async (job) => {
     const { id: originalJobId, ...jobData } = job;
 
@@ -229,6 +228,7 @@ export default function Bookings() {
   const handleDownloadArchivedWTN = async (archivedJob) => {
     const jobRef = archivedJob.original_job_id ?? archivedJob.id;
 
+    // Try to fetch archived WTN
     let { data: wtn } = await supabase
       .from('archived_waste_transfer_notes')
       .select('*')
@@ -237,6 +237,7 @@ export default function Bookings() {
       .limit(1)
       .maybeSingle();
 
+    // Fallback to live table if not found
     if (!wtn) {
       const res2 = await supabase
         .from('waste_transfer_notes')
@@ -253,134 +254,8 @@ export default function Bookings() {
       return;
     }
 
-    const loadImage = (src) =>
-      new Promise((resolve, reject) => {
-        if (!src) return resolve(null);
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        img.onload = () => resolve(img);
-        img.onerror = reject;
-        img.src = src;
-      });
-
-    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-
-    try {
-      const logoImg = await loadImage('/images/brooks-logo.png');
-      if (logoImg) doc.addImage(logoImg, 'PNG', 150, 10, 40, 0);
-    } catch (_) {}
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(18);
-    doc.setTextColor('#000000');
-    doc.text('Brooks Waste – Sewage Specialist', 10, 15);
-
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.text('Kendale The Drive, Rayleigh Essex, SS6 8XQ', 10, 21);
-    doc.text('01268776126 · info@brookswaste.co.uk · www.brookswaste.co.uk', 10, 26);
-    doc.text('Waste Carriers Reg #: CBDU167551', 10, 31);
-
-    // --- Flexible wrapping boxes for WTN PDF ---
-    let y = 40;
-    const PAGE_LEFT = 10;
-    const PAGE_WIDTH = 190;
-    const PAGE_BOTTOM = 282;
-    const LINE_HEIGHT = 4.5;
-    const BOX_VPAD = 2.5;
-    const GAP = 2;
-    const TEXT_X = PAGE_LEFT + 2;
-
-    const ensureRoom = (height) => {
-      if (y + height > PAGE_BOTTOM) {
-        doc.addPage();
-        y = 40;
-      }
-    };
-
-    const addField = (label, value) => {
-      const txt = `${label}: ${value ?? '-'}`;
-      const wrapped = doc.splitTextToSize(txt, PAGE_WIDTH - 4);
-      const boxHeight = BOX_VPAD * 2 + wrapped.length * LINE_HEIGHT;
-
-      ensureRoom(boxHeight);
-
-      doc.setDrawColor(100);
-      doc.setLineWidth(0.2);
-      doc.rect(PAGE_LEFT, y, PAGE_WIDTH, boxHeight);
-
-      doc.setFontSize(10);
-      let tY = y + BOX_VPAD + LINE_HEIGHT;
-      wrapped.forEach((line, i) => {
-        doc.text(line, TEXT_X, tY + i * LINE_HEIGHT);
-      });
-
-      y += boxHeight + GAP;
-    };
-
-    // --- Use addField for each data row ---
-    addField('Job ID', wtn.job_id);
-    addField('Date of Service', wtn.date_of_service ?? archivedJob?.date_of_service ?? '-');
-    addField('Client Name', wtn.client_name);
-    addField('Client Telephone', wtn.client_telephone);
-    addField('Client Email', wtn.client_email);
-    addField('Client Address', wtn.client_address);
-    addField('Vehicle Registration', wtn.vehicle_registration);
-    addField('Waste Containment', wtn.waste_containment);
-    addField('SIC Code', wtn.sic_code);
-    addField('EWC', wtn.ewc);
-    addField('Waste Description', wtn.waste_description);
-    addField('Amount Removed', wtn.amount_removed);
-    addField('Disposal Address', wtn.disposal_address);
-    addField('Job Description', wtn.job_description);
-    addField('Driver Name', wtn.driver_name);
-    addField('Customer Name', wtn.customer_name);
-
-
-    // --- Signatures ---
-    const SIG_W = 60;
-    const SIG_H = 30;
-    const SIG_LABEL_H = 5;
-
-    ensureRoom(SIG_LABEL_H + SIG_H + 15);
-
-    doc.setFontSize(10);
-    doc.text('Driver Signature:', PAGE_LEFT, y);
-    doc.text('Customer Signature:', PAGE_LEFT + 100, y);
-
-    try {
-      const opSig = await loadImage(wtn.operative_signature);
-      if (opSig) doc.addImage(opSig, 'PNG', PAGE_LEFT, y + 5, SIG_W, SIG_H);
-    } catch (_) {}
-
-    try {
-      const custSig = await loadImage(wtn.customer_signature);
-      if (custSig) doc.addImage(custSig, 'PNG', PAGE_LEFT + 100, y + 5, SIG_W, SIG_H);
-    } catch (_) {}
-
-    y += SIG_H + 15;
-
-
-    try {
-      const opSig = await loadImage(wtn.operative_signature);
-      if (opSig) doc.addImage(opSig, 'PNG', 10, y + 5, signatureWidth, signatureHeight);
-    } catch (_) {}
-
-    try {
-      const custSig = await loadImage(wtn.customer_signature);
-      if (custSig) doc.addImage(custSig, 'PNG', 110, y + 5, signatureWidth, signatureHeight);
-    } catch (_) {}
-
-    doc.setTextColor('#000');
-    doc.setFontSize(7);
-    doc.text(
-      'You are signing to say you have read the above details and that they are correct and the operative has completed the job to a satisfactory standard. Brooks Waste ltd takes no responsibility for any damage done to your property where access is not suitable for a tanker. Please see our full terms and conditions on brookswaste.co.uk - Registered in England 06747484 Registered Office: 4 Chester Court, Chester Hall Lane Basildon, Essex SS14 3WR',
-      10,
-      282,
-      { maxWidth: 190 }
-    );
-
-    doc.save(`WTN_Job_${wtn.job_id}.pdf`);
+    // 🔥 CENTRALIZED PDF GENERATOR
+    generateWTNPDF(wtn)
   };
 
   const handleLogout = async () => {
@@ -415,7 +290,6 @@ export default function Bookings() {
       const driverB = getDriverName(b.driver_id).toLowerCase()
       return driverA.localeCompare(driverB)
     })
-
   const filteredArchivedJobs = archivedJobs
     .filter(job =>
       Object.values(job).some(val =>
@@ -478,14 +352,14 @@ export default function Bookings() {
       </header>
 
       <div className="mx-auto max-w-screen-lg px-4 py-6 space-y-6">
-        {/* Back link */}
+        {/* Back Link */}
         <div className="text-sm text-gray-500">
           <button onClick={() => navigate('/admin-dashboard')} className="hover:underline">
             ← Back to Admin Dashboard
           </button>
         </div>
 
-        {/* Search & Filters */}
+        {/* Search + Filters */}
         <div className="rounded-2xl bg-white shadow-sm border p-4">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
             <input
@@ -541,7 +415,7 @@ export default function Bookings() {
           </div>
         </div>
 
-        {/* Live Jobs Table */}
+        {/* --- LIVE JOBS TABLE --- */}
         <div className="rounded-2xl bg-white shadow-sm border overflow-x-auto">
           <table className="min-w-full border-collapse">
             <thead className="bg-pink-50 sticky top-0 z-10">
@@ -560,6 +434,7 @@ export default function Bookings() {
                 <th className="border px-3 py-2">Actions</th>
               </tr>
             </thead>
+
             <tbody>
               {filteredJobs.map((job) => (
                 <tr key={job.id} className="text-sm hover:bg-pink-50">
@@ -568,6 +443,8 @@ export default function Bookings() {
                   <td className="border px-3 py-2">{job.address_line_1}</td>
                   <td className="border px-3 py-2">{job.post_code}</td>
                   <td className="border px-3 py-2">{job.date_of_service}</td>
+
+                  {/* Driver assign */}
                   <td className="border px-3 py-2">
                     <select
                       className="p-1 rounded border"
@@ -576,12 +453,12 @@ export default function Bookings() {
                     >
                       <option value="">Select Driver</option>
                       {drivers.map((driver) => (
-                        <option key={driver.id} value={driver.id}>
-                          {driver.name}
-                        </option>
+                        <option key={driver.id} value={driver.id}>{driver.name}</option>
                       ))}
                     </select>
                   </td>
+
+                  {/* Job Order */}
                   <td className="border px-3 py-2">
                     <select
                       className="p-1 rounded border w-20"
@@ -590,12 +467,12 @@ export default function Bookings() {
                     >
                       <option value="">-</option>
                       {[...Array(20)].map((_, i) => (
-                        <option key={i + 1} value={i + 1}>
-                          {i + 1}
-                        </option>
+                        <option key={i} value={i + 1}>{i + 1}</option>
                       ))}
                     </select>
                   </td>
+
+                  {/* Editable fields */}
                   <td className="border px-3 py-2">
                     <select
                       className="p-1 rounded border"
@@ -608,6 +485,7 @@ export default function Bookings() {
                       <option value="No">No</option>
                     </select>
                   </td>
+
                   <td className="border px-3 py-2">
                     <select
                       className="p-1 rounded border"
@@ -620,6 +498,7 @@ export default function Bookings() {
                       <option value="No">No</option>
                     </select>
                   </td>
+
                   <td className="border px-3 py-2">
                     <select
                       className="p-1 rounded border"
@@ -632,6 +511,7 @@ export default function Bookings() {
                       <option value="No">No</option>
                     </select>
                   </td>
+
                   <td className="border px-3 py-2">
                     <select
                       className="p-1 rounded border"
@@ -644,15 +524,41 @@ export default function Bookings() {
                       <option value="No">No</option>
                     </select>
                   </td>
+
+                  {/* Action Buttons */}
                   <td className="border px-3 py-2">
-                    <div className="flex gap-2 flex-nowrap">
-                      <button className="btn btn-neutral btn-xs" onClick={() => handleEdit(job)}>Edit</button>
+                    <div className="flex gap-2">
+                      <button
+                        className="btn btn-neutral btn-xs"
+                        onClick={() => handleEdit(job)}
+                      >
+                        Edit
+                      </button>
+
+                      {/* WTN Button */}
                       {wtns[job.id] ? (
-                        <button className="btn btn-neutral btn-xs" onClick={() => handleNewWTN(job)}>Edit WTN</button>
+                        <button
+                          className="btn btn-neutral btn-xs"
+                          onClick={() => handleNewWTN(job)}
+                        >
+                          Edit WTN
+                        </button>
                       ) : (
-                        <button className="btn btn-neutral btn-xs" onClick={() => handleNewWTN(job)}>New WTN</button>
+                        <button
+                          className="btn btn-neutral btn-xs"
+                          onClick={() => handleNewWTN(job)}
+                        >
+                          New WTN
+                        </button>
                       )}
-                      <button className="btn btn-neutral btn-xs" onClick={() => handleArchive(job)}>Archive</button>
+
+                      {/* Archive */}
+                      <button
+                        className="btn btn-neutral btn-xs"
+                        onClick={() => handleArchive(job)}
+                      >
+                        Archive
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -661,7 +567,7 @@ export default function Bookings() {
           </table>
         </div>
 
-        {/* Archived Jobs Toggle */}
+        {/* --- Archived Section Toggle --- */}
         <div className="text-center">
           <button
             className="btn btn-neutral btn-sm"
@@ -673,6 +579,7 @@ export default function Bookings() {
 
         {showArchived && (
           <>
+            {/* Archived Filters */}
             <div className="rounded-2xl bg-white shadow-sm border p-4">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                 <input
@@ -728,6 +635,7 @@ export default function Bookings() {
               </div>
             </div>
 
+            {/* Archived Table */}
             <div className="rounded-2xl bg-white shadow-sm border overflow-x-auto">
               <table className="min-w-full border-collapse">
                 <thead className="bg-pink-50">
@@ -743,6 +651,7 @@ export default function Bookings() {
                     <th className="border px-3 py-2">Actions</th>
                   </tr>
                 </thead>
+
                 <tbody>
                   {filteredArchivedJobs.map((job) => (
                     <tr key={job.id} className="text-sm hover:bg-pink-50">
@@ -754,6 +663,7 @@ export default function Bookings() {
                       <td className="border px-3 py-2">{job.job_complete ? 'Yes' : 'No'}</td>
                       <td className="border px-3 py-2">{job.payment_type}</td>
                       <td className="border px-3 py-2">{job.paid ? 'Yes' : 'No'}</td>
+
                       <td className="border px-3 py-2">
                         <div className="flex gap-2">
                           <button
@@ -765,28 +675,30 @@ export default function Bookings() {
                           >
                             View / Edit
                           </button>
+
                           <button
                             className="btn btn-neutral btn-xs"
                             onClick={() => handleDownloadArchivedWTN(job)}
                           >
                             WTN PDF
                           </button>
+
                           <button
                             className="btn btn-neutral btn-xs"
                             onClick={async () => {
-                              const { data: archivedWTN, error } = await supabase
+                              const { data: archivedWTN } = await supabase
                                 .from('archived_waste_transfer_notes')
                                 .select('*')
                                 .eq('job_id', job.original_job_id ?? job.id)
-                                .single();
+                                .maybeSingle()
 
-                              if (error || !archivedWTN) {
-                                alert('No archived WTN found for this job.');
-                                return;
+                              if (!archivedWTN) {
+                                alert('No archived WTN found.')
+                                return
                               }
 
-                              setSelectedWTN(archivedWTN);
-                              setActiveModal('editArchivedWtn');
+                              setSelectedWTN(archivedWTN)
+                              setActiveModal('editArchivedWtn')
                             }}
                           >
                             Edit Archived WTN
@@ -795,6 +707,7 @@ export default function Bookings() {
                       </td>
                     </tr>
                   ))}
+
                   {filteredArchivedJobs.length === 0 && (
                     <tr>
                       <td className="px-3 py-6 text-center text-gray-500" colSpan={9}>
@@ -809,41 +722,59 @@ export default function Bookings() {
         )}
       </div>
 
-      {/* Modals */}
+      {/* --- MODALS --- */}
       {activeModal === 'edit' && selectedJob && (
-        <EditModal job={selectedJob} onClose={() => setActiveModal(null)} onSave={fetchJobs} />
+        <EditModal
+          job={selectedJob}
+          onClose={() => setActiveModal(null)}
+          onSave={fetchJobs}
+        />
       )}
+
       {activeModal === 'createWtn' && selectedJob && (
-        <NewWTN jobId={selectedJob.id} onClose={() => setActiveModal(null)} onSubmit={() => {
-          setActiveModal(null)
-          fetchJobs()
-          fetchWTNs()
-        }} />
+        <NewWTN
+          jobId={selectedJob.id}
+          onClose={() => setActiveModal(null)}
+          onSubmit={() => {
+            setActiveModal(null)
+            fetchJobs()
+            fetchWTNs()
+          }}
+        />
       )}
+
       {activeModal === 'editWtn' && selectedWTN && (
-        <EditWTN wtn={selectedWTN} onClose={() => setActiveModal(null)} onSubmit={() => {
-          setActiveModal(null)
-          fetchJobs()
-          fetchWTNs()
-        }} />
+        <EditWTN
+          wtn={selectedWTN}
+          onClose={() => setActiveModal(null)}
+          onSubmit={() => {
+            setActiveModal(null)
+            fetchJobs()
+            fetchWTNs()
+          }}
+        />
       )}
+
       {activeModal === 'editArchivedWtn' && selectedWTN && (
         <EditWTN
           wtn={selectedWTN}
           onClose={() => setActiveModal(null)}
           onSubmit={() => {
-            setActiveModal(null);
-            fetchArchivedJobs();
+            setActiveModal(null)
+            fetchArchivedJobs()
           }}
           tableName="archived_waste_transfer_notes"
         />
       )}
-      {activeModal === 'viewWtn' && wtnPDFUrl && (
-        <ViewWTNPDFModal pdfUrl={wtnPDFUrl} onClose={() => setActiveModal(null)} />
-      )}
+
       {activeModal === 'viewArchived' && (
-        <ViewEditArchivedJobModal job={selectedJob} onClose={() => setActiveModal(null)} onSave={fetchArchivedJobs} />
+        <ViewEditArchivedJobModal
+          job={selectedJob}
+          onClose={() => setActiveModal(null)}
+          onSave={fetchArchivedJobs}
+        />
       )}
+
       {activeModal === 'add' && (
         <NewBookingModal
           onClose={() => setActiveModal(null)}

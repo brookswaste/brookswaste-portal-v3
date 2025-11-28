@@ -1,8 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react'
-import SignatureCanvas from 'react-signature-canvas'
+import React, { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
-import { v4 as uuidv4 } from 'uuid'
-import jsPDF from 'jspdf'
+import generateWTNPDF from '../utils/generateWTNPDF'
 
 const EWC_OPTIONS = [
   '13 05 – Oil/Water Separator Contents',
@@ -38,7 +36,31 @@ const EWC_OPTIONS = [
   '20 03 03 - Street Cleaning Residues (Gully Waste)',
   '20 03 04 - Septic Tank Sludge',
   '20 03 06 - Waste from Sewage Cleaning',
-  '20 03 99 - Municipal Waste Not Otherwise Specified'
+  '20 03 99 - Municipal Waste Not Otherwise Specified',
+  'Other - ______________________________________',
+];
+
+const VEHICLE_REGISTRATION_OPTIONS = [
+  'WX07 TVD',
+  'CE55 PET',
+  'HX12 NNT',
+  'PN09 JPY',
+  'PO06 EAN',
+  'PO05 TOM',
+  'GD07 CZN',
+  'HX14 WDL',
+  'YJ57 FMM',
+  'PO05 DNO',
+  'BX64 BWL',
+  'RK66 PYV',
+  'RK66 PZN',
+  'TO11 LTS',
+  'OU12 ZJV',
+  'GH16 MVT',
+  'LE71 LOO',
+  'WF61 WVU',
+  'EF15 ZBY',
+  'Other – ___________________________'
 ];
 
 // ▼ SIC: show category headers but make them unselectable
@@ -185,10 +207,9 @@ const DISPOSAL_ADDRESS_OPTIONS = [
   'Other - ______________________________________',
 ];
 
-export default function EditWTN({ wtn, onClose, onSubmit }) {
+export default function EditWTN({ wtn, onClose, onSubmit, tableName = 'waste_transfer_notes' }) {
   const [formData, setFormData] = useState(null)
   const [loading, setLoading] = useState(false)
-  const sigCanvas = useRef()
 
   useEffect(() => {
     if (wtn) {
@@ -214,8 +235,8 @@ export default function EditWTN({ wtn, onClose, onSubmit }) {
     }
 
     // Validate EWC pick
-    if (!formData.ewc || !EWC_OPTIONS.includes(formData.ewc)) {
-      alert('Please select a valid EWC code.');
+    if (!formData.ewc || String(formData.ewc).trim() === '') {
+      alert('Please enter an EWC code.');
       setLoading(false);
       return;
     }
@@ -264,6 +285,14 @@ export default function EditWTN({ wtn, onClose, onSubmit }) {
       else if (payload[k] === '') payload[k] = null;
     });
 
+    // If "Other" was selected, use the custom text instead
+    if (
+      formData.vehicle_registration === 'Other – ___________________________' &&
+      formData.vehicle_registration_other
+    ) {
+      payload.vehicle_registration = formData.vehicle_registration_other.trim();
+    }
+
     // Preserve creator if present
     if (!payload.created_by && formData.created_by) {
       payload.created_by = formData.created_by;
@@ -271,8 +300,17 @@ export default function EditWTN({ wtn, onClose, onSubmit }) {
 
     console.log('Updating with keys:', Object.keys(payload));
 
+    // If EWC is "Other", save custom text into ewc; do not send helper field
+    if (
+      formData.ewc === 'Other - ______________________________________' &&
+      formData.ewc_other
+    ) {
+      payload.ewc = String(formData.ewc_other).trim()
+    }
+    delete payload.ewc_other
+
     const { error } = await supabase
-      .from('waste_transfer_notes')
+      .from(tableName)
       .update(payload)
       .eq('id', formData.id);
 
@@ -286,298 +324,10 @@ export default function EditWTN({ wtn, onClose, onSubmit }) {
     setLoading(false);
   };
 
-  const handleDownloadPDF = async () => {
-    const { default: jsPDF } = await import('jspdf')
-    // Try multiple layouts to fit on 1 page
-    const LAYOUTS = [
-      { name: 'normal', headerSize: 14, labelSize: 8.5, valueSize: 10, sectionGap: 12, lineGap: 3, sigHeight: 30 },
-      { name: 'compact', headerSize: 13, labelSize: 8,   valueSize: 9.2, sectionGap: 10, lineGap: 2.5, sigHeight: 26 },
-      { name: 'ultra',   headerSize: 12, labelSize: 7.6, valueSize: 8.6, sectionGap: 9,  lineGap: 2.2, sigHeight: 22 },
-    ];
-
-    const LIGHT_PINK = '#fde2e7';
-    const TEXT = '#111111';
-    const MUTED = '#6b7280';
-    const RULE = '#e5e7eb';
-
-    // Synchronous helper to load an image as dataURL (optional)
-    const loadDataUrl = async (url) => {
-      try {
-        const res = await fetch(url, { cache: 'no-store' });
-        if (!res.ok) return null;
-        const blob = await res.blob();
-        return await new Promise((resolve) => {
-          const fr = new FileReader();
-          fr.onload = () => resolve(fr.result);
-          fr.readAsDataURL(blob);
-        });
-      } catch {
-        return null;
-      }
-    };
-
-    const renderOnce = async (layout) => {
-      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-
-      // Page metrics
-      const MARGIN = 12;
-      const PAGE_W = 210;
-      const PAGE_H = 297;
-      const CONTENT_W = PAGE_W - MARGIN * 2;
-      const BOTTOM_SAFE = 287;
-      const COL_GAP = 6;
-      const COL_W = (CONTENT_W - COL_GAP) / 2;
-
-      let y = MARGIN;
-
-      // Helpers
-      const line = (x1, y1, x2, y2) => {
-        doc.setDrawColor(RULE);
-        doc.setLineWidth(0.2);
-        doc.line(x1, y1, x2, y2);
-      };
-      const wouldOverflow = (needed = 20) => (y + needed > BOTTOM_SAFE);
-
-      const sectionHeader = (title) => {
-        y += 6;
-        doc.setFillColor(LIGHT_PINK);
-        doc.setTextColor('#000000');
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(layout.headerSize - 2);
-        doc.rect(MARGIN, y, CONTENT_W, 8, 'F');
-        doc.text(title, MARGIN + 3, y + 5.8);
-        y += layout.sectionGap;
-        doc.setTextColor(TEXT);
-      };
-
-      const fitHeight = (label, value, width) => {
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(layout.labelSize);
-        const lab = doc.splitTextToSize((label || '').toUpperCase(), width);
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(layout.valueSize);
-        const val = doc.splitTextToSize(value || '-', width);
-        const labelBlock = lab.length * Math.max(layout.lineGap + 1.2, 3.8);
-        const valueBlock = val.length * Math.max(layout.lineGap + 1.6, 4.6);
-        return labelBlock + valueBlock + 2.5;
-      };
-
-      const drawField = (x, yStart, label, value, width) => {
-        doc.setTextColor(MUTED);
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(layout.labelSize);
-        const lab = doc.splitTextToSize((label || '').toUpperCase(), width);
-        let yCursor = yStart;
-        lab.forEach((l, i) => doc.text(l, x, yCursor + 3.2 + i * (layout.lineGap + 1)));
-        yCursor += lab.length * (layout.lineGap + 1) + 1;
-
-        doc.setTextColor(TEXT);
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(layout.valueSize);
-        const val = doc.splitTextToSize(value || '-', width);
-        val.forEach((v, i) => doc.text(v, x, yCursor + 3.8 + i * (layout.lineGap + 1.4)));
-        yCursor += val.length * (layout.lineGap + 1.4) + 1.5;
-
-        line(x, yCursor + 1.1, x + width, yCursor + 1.1);
-        return yCursor + 2.2;
-      };
-
-      // === Header (always draw text first) ===
-      // Optional logo (dataURL). If it fails, we still have the header text.
-      const logoDataUrl = await loadDataUrl('/images/brooks-logo.png');
-      if (logoDataUrl) doc.addImage(logoDataUrl, 'PNG', PAGE_W - MARGIN - 36, MARGIN, 36, 0);
-
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(layout.headerSize);
-      doc.setTextColor(TEXT);
-      doc.text('Brooks Waste – Sewage Specialist', MARGIN, y + 6);
-
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9);
-      doc.setTextColor(MUTED);
-      doc.text('Kendale The Drive, Rayleigh Essex, SS6 8XQ', MARGIN, y + 11);
-      doc.text('01268776126 · info@brookswaste.co.uk · www.brookswaste.co.uk', MARGIN, y + 15.5);
-      doc.text('Waste Carriers Reg #: CBDU167551', MARGIN, y + 20);
-      y += 24;
-
-      // Display values
-      const displaySIC =
-        formData.sic_code === '00000 - Other: _______' ? (formData.sic_other || '') : (formData.sic_code || '');
-      const displayEWC =
-        formData.ewc === 'Other - ______________________________________'
-          ? (formData.ewc_other || 'Other (unspecified)')
-          : (formData.ewc || '');
-
-      // === Job Details (2 cols) ===
-      sectionHeader('Job Details');
-
-      let leftY = y;
-      let rightY = y;
-      const X1 = MARGIN;
-      const X2 = MARGIN + COL_W + COL_GAP;
-
-      const jobLeft = [
-        ['Date of Service', formData.date_of_service],
-        ['Customer Job Reference', formData.customer_job_reference],
-        ['Job Description', formData.job_description],
-      ];
-      const jobRight = [
-        ['Waste Containment', formData.waste_containment],
-        ['Vehicle Registration', formData.vehicle_registration],
-        ['Driver Name', formData.driver_name],
-      ];
-
-      for (const [label, value] of jobLeft) {
-        const h = fitHeight(label, value || '-', COL_W);
-        if (wouldOverflow(h)) return { doc, overflow: true };
-        leftY = drawField(X1, leftY, label, value || '-', COL_W);
-      }
-      for (const [label, value] of jobRight) {
-        const h = fitHeight(label, value || '-', COL_W);
-        if (wouldOverflow(h)) return { doc, overflow: true };
-        rightY = drawField(X2, rightY, label, value || '-', COL_W);
-      }
-      y = Math.max(leftY, rightY);
-
-      // === Client Details (2 cols) ===
-      sectionHeader('Client Details');
-      leftY = y; rightY = y;
-
-      const clientLeft = [
-        ['Client Name', formData.client_name],
-        ['Client Email', formData.client_email],
-        ['Client Telephone', formData.client_telephone],
-      ];
-      const clientRight = [
-        ['Site Address', formData.site_address],
-      ];
-
-      for (const [label, value] of clientLeft) {
-        const h = fitHeight(label, value || '-', COL_W);
-        if (wouldOverflow(h)) return { doc, overflow: true };
-        leftY = drawField(X1, leftY, label, value || '-', COL_W);
-      }
-      for (const [label, value] of clientRight) {
-        const h = fitHeight(label, value || '-', COL_W);
-        if (wouldOverflow(h)) return { doc, overflow: true };
-        rightY = drawField(X2, rightY, label, value || '-', COL_W);
-      }
-      y = Math.max(leftY, rightY);
-
-      // === Waste Details (2 cols) ===
-      sectionHeader('Waste Details');
-      leftY = y; rightY = y;
-
-      const wasteLeft = [
-        ['SIC Code', displaySIC],
-        ['EWC Code', displayEWC],
-        ['Waste Description', formData.waste_description],
-      ];
-      const wasteRight = [
-        ['Amount Removed', formData.amount_removed],
-        ['Disposal Address', formData.disposal_address],
-      ];
-
-      for (const [label, value] of wasteLeft) {
-        const h = fitHeight(label, value || '-', COL_W);
-        if (wouldOverflow(h)) return { doc, overflow: true };
-        leftY = drawField(X1, leftY, label, value || '-', COL_W);
-      }
-      for (const [label, value] of wasteRight) {
-        const h = fitHeight(label, value || '-', COL_W);
-        if (wouldOverflow(h)) return { doc, overflow: true };
-        rightY = drawField(X2, rightY, label, value || '-', COL_W);
-      }
-      y = Math.max(leftY, rightY);
-
-      // === Signatures ===
-      sectionHeader('Signatures');
-
-      const SIG_W = (CONTENT_W - COL_GAP) / 2;
-      const SIG_H = layout.sigHeight;
-      if (wouldOverflow(SIG_H + 20)) return { doc, overflow: true };
-
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9);
-      doc.setTextColor(MUTED);
-      doc.text('Driver Signature', MARGIN, y + 4);
-      doc.text('Customer Signature', MARGIN + SIG_W + COL_GAP, y + 4);
-
-      doc.setDrawColor(RULE);
-      doc.setLineWidth(0.2);
-      doc.rect(MARGIN, y + 6, SIG_W, SIG_H);
-      doc.rect(MARGIN + SIG_W + COL_GAP, y + 6, SIG_W, SIG_H);
-
-      if (formData.operative_signature) {
-        doc.addImage(formData.operative_signature, 'PNG', MARGIN + 2, y + 8, SIG_W - 4, SIG_H - 4);
-      }
-      if (formData.customer_signature) {
-        doc.addImage(formData.customer_signature, 'PNG', MARGIN + SIG_W + COL_GAP + 2, y + 8, SIG_W - 4, SIG_H - 4);
-      }
-
-      y += SIG_H + 12;
-
-      // === Additional Comments ===
-      sectionHeader('Additional Comments');
-
-      const commentsText = (formData.additional_comments || '').trim() || '-';
-
-      // Split to fit page width
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(layout.valueSize);
-      doc.setTextColor(TEXT);
-
-      const commentLines = doc.splitTextToSize(commentsText, CONTENT_W - 6);
-
-      // Compute a nice box height (min height + padding)
-      const COMMENT_LINE_H = Math.max(layout.lineGap + 1.6, 4.6);
-      const boxHeight = Math.max(
-        layout.sigHeight,                      // give it some presence
-        commentLines.length * COMMENT_LINE_H + 8 // text + padding
-      );
-
-      // If this would overflow the page, signal overflow so the next layout tries
-      if (wouldOverflow(boxHeight + 6)) return { doc, overflow: true };
-
-      // Draw box and text
-      doc.setDrawColor(RULE);
-      doc.setLineWidth(0.2);
-      doc.rect(MARGIN, y, CONTENT_W, boxHeight);
-
-      doc.text(commentLines, MARGIN + 3, y + 6);
-      y += boxHeight + 6;
-
-      // Terms / footer
-      doc.setTextColor(MUTED);
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(7.1);
-      const terms = doc.splitTextToSize(
-        'You are signing to say you have read the above details and that they are correct and the operative has completed the job to a satisfactory standard. Brooks Waste Ltd takes no responsibility for any damage done to your property where access is not suitable for a tanker. Please see our full terms and conditions on brookswaste.co.uk - Registered in England 06747484 Registered Office: 4 Chester Court, Chester Hall Lane Basildon, Essex SS14 3WR',
-        CONTENT_W
-      );
-      if (wouldOverflow(terms.length * 3.8 + 10)) return { doc, overflow: true };
-      doc.text(terms, MARGIN, PAGE_H - MARGIN - 8);
-
-      return { doc, overflow: false };
-    };
-    
-    // Try to fit on one page by stepping through layouts
-    let finalDoc = null;
-    for (const layout of LAYOUTS) {
-      const { doc, overflow } = await renderOnce(layout);
-      if (!overflow) {
-        finalDoc = doc;
-        break;
-      }
-    }
-    if (!finalDoc) {
-      const { doc } = await renderOnce(LAYOUTS[LAYOUTS.length - 1]);
-      finalDoc = doc;
-    }
-
-    const safeRef = (formData.customer_job_reference || 'WTN').replace(/[^\w\-]+/g, '_');
-    finalDoc.save(`WTN_${safeRef}.pdf`);
-  };
+  const handleDownloadPDF = () => {
+    if (!formData) return
+    generateWTNPDF(formData)
+  }
 
   if (!formData) return null
 
@@ -613,21 +363,37 @@ export default function EditWTN({ wtn, onClose, onSubmit }) {
             <div key={name} className={name === 'additional_comments' ? 'col-span-2' : ''}>
               <label className="text-xs text-gray-600">{label}</label>
 
-              {name === 'ewc' ? (
-                <select
-                  name="ewc"
-                  value={formData.ewc || ''}
-                  onChange={handleChange}
-                  required
-                  className="w-full p-2 border rounded"
-                >
-                  <option value="">Select EWC code…</option>
-                  {EWC_OPTIONS.map((opt) => (
-                    <option key={opt} value={opt}>
-                      {opt}
-                    </option>
-                  ))}
-                </select>
+              { name === 'ewc' ? (
+                <>
+                  <select
+                    name="ewc"
+                    value={formData.ewc || ''}
+                    onChange={handleChange}
+                    required
+                    className="w-full p-2 border rounded"
+                  >
+                    <option value="">Select EWC code…</option>
+                    {EWC_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt}>
+                        {opt}
+                      </option>
+                    ))}
+                  </select>
+
+                  {formData.ewc === 'Other - ______________________________________' && (
+                    <div className="mt-2">
+                      <label className="text-xs text-gray-600">Custom EWC Code/Description</label>
+                      <input
+                        type="text"
+                        name="ewc_other"
+                        value={formData.ewc_other || ''}
+                        onChange={(e) => setFormData((prev) => ({ ...prev, ewc_other: e.target.value }))}
+                        placeholder="Enter custom EWC"
+                        className="w-full p-2 border rounded"
+                      />
+                    </div>
+                  )}
+                </>
               ) : name === 'disposal_address' ? (
                 <select
                   name="disposal_address"
@@ -677,6 +443,36 @@ export default function EditWTN({ wtn, onClose, onSubmit }) {
                         value={formData.sic_other || ''}
                         onChange={(e) => setFormData({ ...formData, sic_other: e.target.value })}
                         placeholder="Type your custom SIC code or description"
+                        className="w-full p-2 border rounded"
+                      />
+                    </div>
+                  )}
+                </>
+              ) : name === 'vehicle_registration' ? (
+                <>
+                  <select
+                    name="vehicle_registration"
+                    value={formData.vehicle_registration || ''}
+                    onChange={handleChange}
+                    className="w-full p-2 border rounded"
+                  >
+                    <option value="">Select vehicle…</option>
+                    {VEHICLE_REGISTRATION_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+
+                  {formData.vehicle_registration === 'Other – ___________________________' && (
+                    <div className="mt-2">
+                      <label className="text-xs text-gray-600">Custom Vehicle Registration</label>
+                      <input
+                        type="text"
+                        name="vehicle_registration_other"
+                        value={formData.vehicle_registration_other || ''}
+                        onChange={(e) =>
+                          setFormData((prev) => ({ ...prev, vehicle_registration_other: e.target.value }))
+                        }
+                        placeholder="Enter custom vehicle registration"
                         className="w-full p-2 border rounded"
                       />
                     </div>
