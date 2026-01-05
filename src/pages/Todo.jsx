@@ -134,7 +134,7 @@ export default function Todo() {
         <div className="flex items-center justify-between">
           <div className="text-sm text-gray-500">
             <button
-              onClick={() => navigate('/admin-dashboard')}
+              onClick={() => navigate('/bookings')}
               className="hover:underline"
             >
               ← Back to Admin Dashboard

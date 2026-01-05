@@ -3,6 +3,7 @@ import { supabase } from '../supabaseClient'
 import generateWTNPDF from '../utils/generateWTNPDF'
 
 const EWC_OPTIONS = [
+  '20 03 04 - Septic Tank Sludge',
   '13 05 – Oil/Water Separator Contents',
   '13 05 01* - Solids from Grit Chambers and Oil/Water Separators',
   '13 05 02* - Sludges from Oil/Water Separators',
@@ -34,7 +35,6 @@ const EWC_OPTIONS = [
   '20 01 26* - Oil and Fat Other Than Those Mentioned in 20 01 25',
   '20 03 – Other Municipal Wastes',
   '20 03 03 - Street Cleaning Residues (Gully Waste)',
-  '20 03 04 - Septic Tank Sludge',
   '20 03 06 - Waste from Sewage Cleaning',
   '20 03 99 - Municipal Waste Not Otherwise Specified',
   'Other - ______________________________________',

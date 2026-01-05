@@ -31,6 +31,8 @@ export default function Bookings() {
   const [paymentTypeFilter, setPaymentTypeFilter] = useState('All')
   const [selectedDriverFilter, setSelectedDriverFilter] = useState('')
   const [selectedDateFilter, setSelectedDateFilter] = useState('')
+  const [jobIdSearch, setJobIdSearch] = useState('')
+  const [archivedJobIdSearch, setArchivedJobIdSearch] = useState('')
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -290,6 +292,10 @@ export default function Bookings() {
       const driverB = getDriverName(b.driver_id).toLowerCase()
       return driverA.localeCompare(driverB)
     })
+    .filter((job) => {
+      if (!jobIdSearch) return true
+      return String(job.id).includes(jobIdSearch)
+    })
   const filteredArchivedJobs = archivedJobs
     .filter(job =>
       Object.values(job).some(val =>
@@ -316,6 +322,10 @@ export default function Bookings() {
       const da = getDriverName(a.driver_id).toLowerCase()
       const db = getDriverName(b.driver_id).toLowerCase()
       return da.localeCompare(db)
+    })
+    .filter((job) => {
+      if (!archivedJobIdSearch) return true
+      return String(job.id).includes(archivedJobIdSearch)
     })
 
   return (
@@ -354,8 +364,7 @@ export default function Bookings() {
       <div className="mx-auto max-w-screen-lg px-4 py-6 space-y-6">
         {/* Back Link */}
         <div className="text-sm text-gray-500">
-          <button onClick={() => navigate('/admin-dashboard')} className="hover:underline">
-            ← Back to Admin Dashboard
+          <button onClick={() => navigate('/bookings')} className="hover:underline">
           </button>
         </div>
 
@@ -386,7 +395,7 @@ export default function Bookings() {
               onChange={(e) => setPaymentTypeFilter(e.target.value)}
             >
               <option value="All">All Payment Types</option>
-              <option value="Cash">Cash</option>
+              <option value="Quote">Quote</option>
               <option value="Card">Card</option>
               <option value="Invoice">Invoice</option>
               <option value="Cheque">Cheque</option>
@@ -414,6 +423,15 @@ export default function Bookings() {
             />
           </div>
         </div>
+        <div className="mb-3">
+          <input
+            type="text"
+            placeholder="Search by Job ID"
+            value={jobIdSearch}
+            onChange={(e) => setJobIdSearch(e.target.value)}
+            className="w-64 p-2 border rounded text-sm"
+          />
+        </div>
 
         {/* --- LIVE JOBS TABLE --- */}
         <div className="rounded-2xl bg-white shadow-sm border overflow-x-auto">
@@ -424,6 +442,8 @@ export default function Bookings() {
                 <th className="border px-3 py-2">Job Type</th>
                 <th className="border px-3 py-2">Address Line 1</th>
                 <th className="border px-3 py-2">Postcode</th>
+                <th className="border px-3 py-2">Job Cost</th>
+                <th className="border px-3 py-2">Billing Account</th>
                 <th className="border px-3 py-2">Date of Service</th>
                 <th className="border px-3 py-2">Assigned Driver</th>
                 <th className="border px-3 py-2">Order</th>
@@ -437,11 +457,18 @@ export default function Bookings() {
 
             <tbody>
               {filteredJobs.map((job) => (
-                <tr key={job.id} className="text-sm hover:bg-pink-50">
+                <tr 
+                  key={job.id}
+                  className={`text-sm ${
+                    job.job_complete ? 'bg-green-50' : 'bg-orange-50'
+                  } hover:outline hover:outline-1 hover:outline-gray-300`}
+                >
                   <td className="border px-3 py-2">{job.id}</td>
                   <td className="border px-3 py-2">{job.job_type}</td>
                   <td className="border px-3 py-2">{job.address_line_1}</td>
                   <td className="border px-3 py-2">{job.post_code}</td>
+                  <td className="border px-3 py-2">{job.job_cost_inc_vat}</td>
+                  <td className="border px-3 py-2">{job.invoice_address || '-'}</td>
                   <td className="border px-3 py-2">{job.date_of_service}</td>
 
                   {/* Driver assign */}
@@ -633,6 +660,15 @@ export default function Bookings() {
                   onChange={(e) => setArchivedDateFilter(e.target.value)}
                 />
               </div>
+            </div>
+            <div className="mb-3">
+              <input
+                type="text"
+                placeholder="Search archived by Job ID"
+                value={archivedJobIdSearch}
+                onChange={(e) => setArchivedJobIdSearch(e.target.value)}
+                className="w-64 p-2 border rounded text-sm"
+              />
             </div>
 
             {/* Archived Table */}

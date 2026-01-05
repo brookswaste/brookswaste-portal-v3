@@ -18,7 +18,6 @@ export function NewBookingModal({ onClose, onSave }) {
     date_of_service: '',
     driver_id: '',
     invoice_address: '',
-    job_cost_ex_vat: '',
     job_cost_inc_vat: '',
     date_of_collection: '',
     on_site_contact_number: '',
@@ -99,8 +98,7 @@ export function NewBookingModal({ onClose, onSave }) {
     { name: 'email', label: 'Email', type: 'email' },
     { name: 'date_of_service', label: 'Date of Service *', type: 'date' },
     { name: 'driver_id', label: 'Assigned Driver *', type: 'dropdown' },
-    { name: 'invoice_address', label: 'Invoice Address (if different than customer address)' },
-    { name: 'job_cost_ex_vat', label: 'Job Cost ex VAT' },
+    { name: 'invoice_address', label: 'Billing Account' },
     { name: 'job_cost_inc_vat', label: 'Job Cost inc VAT' },
     { name: 'date_of_collection', label: 'Date of Collection', type: 'date' },
     { name: 'on_site_contact_number', label: 'On-site Contact' },
@@ -187,7 +185,7 @@ export function NewBookingModal({ onClose, onSave }) {
                   className="w-full p-2 border rounded"
                 >
                   <option value="">Select payment type</option>
-                  <option value="Cash">Cash</option>
+                  <option value="Quote">Quote</option>
                   <option value="Card">Card</option>
                   <option value="Invoice">Invoice</option>
                   <option value="Cheque">Cheque</option>

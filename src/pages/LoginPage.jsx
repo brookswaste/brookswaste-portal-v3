@@ -30,7 +30,7 @@ export default function LoginPage() {
       .single()
 
     if (adminMatch) {
-      navigate('/admin-dashboard')
+      navigate('/bookings')
     } else {
       navigate('/driver-dashboard')
     }
