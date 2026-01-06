@@ -185,7 +185,7 @@ export function NewBookingModal({ onClose, onSave }) {
                   className="w-full p-2 border rounded"
                 >
                   <option value="">Select payment type</option>
-                  <option value="Quote">Quote</option>
+                  <option value="Cash">Cash</option>
                   <option value="Card">Card</option>
                   <option value="Invoice">Invoice</option>
                   <option value="Cheque">Cheque</option>

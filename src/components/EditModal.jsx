@@ -91,7 +91,7 @@ export default function EditModal({ job, onClose, onSave }) {
       name: 'payment_type',
       label: 'Payment Type',
       type: 'select',
-      options: ['Quote', 'Card', 'Invoice', 'Cheque', 'BACS', 'SumUp', 'TBD'],
+      options: ['Cash', 'Card', 'Invoice', 'Cheque', 'BACS', 'SumUp', 'TBD'],
     },
     { name: 'waste_transfer_note_complete', label: 'WTN Complete', type: 'checkbox' },
     { name: 'job_complete', label: 'Job Complete', type: 'checkbox' },

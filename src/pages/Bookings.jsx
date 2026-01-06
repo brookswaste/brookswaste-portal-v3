@@ -395,7 +395,7 @@ export default function Bookings() {
               onChange={(e) => setPaymentTypeFilter(e.target.value)}
             >
               <option value="All">All Payment Types</option>
-              <option value="Quote">Quote</option>
+              <option value="Cash">Cash</option>
               <option value="Card">Card</option>
               <option value="Invoice">Invoice</option>
               <option value="Cheque">Cheque</option>
