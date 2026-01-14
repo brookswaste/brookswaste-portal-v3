@@ -193,8 +193,13 @@ export default async function generateWTNPDF(wtn, job = null) {
       MARGIN,
       y + 20
     );
-    y += 24;
-
+    y += 30;
+    
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(layout.headerSize);
+    doc.setTextColor(TEXT);
+    doc.text("CONTROLLED WASTE TRANSFER NOTE", MARGIN, y + 4);
+    
     // --- Job Details ---
     sectionHeader("Job Details");
 
