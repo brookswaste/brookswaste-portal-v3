@@ -164,7 +164,7 @@ export default async function generateWTNPDF(wtn, job = null) {
         logoDataUrl,
         "PNG",
         PAGE_W - MARGIN - 36,
-        MARGIN,
+        MARGIN - 6,
         36,
         0
       );
@@ -174,6 +174,9 @@ export default async function generateWTNPDF(wtn, job = null) {
     doc.setFontSize(layout.headerSize);
     doc.setTextColor(TEXT);
     doc.text("Brooks Waste – Sewage Specialist", MARGIN, y + 6);
+
+    doc.setFontSize(layout.headerSize - 1);
+    doc.text("CONTROLLED WASTE TRANSFER NOTE", PAGE_W - MARGIN, y + 6, { align: "right" });
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
@@ -193,12 +196,7 @@ export default async function generateWTNPDF(wtn, job = null) {
       MARGIN,
       y + 20
     );
-    y += 30;
-    
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(layout.headerSize);
-    doc.setTextColor(TEXT);
-    doc.text("CONTROLLED WASTE TRANSFER NOTE", MARGIN, y + 4);
+    y += 24;
     
     // --- Job Details ---
     sectionHeader("Job Details");
