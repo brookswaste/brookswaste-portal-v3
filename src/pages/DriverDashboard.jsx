@@ -15,6 +15,9 @@ export default function DriverDashboard() {
   const [showWTNModalForJob, setShowWTNModalForJob] = useState(null)
   const [editWTNData, setEditWTNData] = useState(null)
   const [acceptedWarning, setAcceptedWarning] = useState(false)
+  const [archivedJobs, setArchivedJobs] = useState([])
+  const [showArchived, setShowArchived] = useState(false)
+
 
   // 🔒 Keys to hide in BOTH sections
   const HIDE_KEYS = new Set([
@@ -54,6 +57,21 @@ export default function DriverDashboard() {
       .eq('date_of_service', todayStr)
 
     setJobs((activeJobs || []).sort((a, b) => (a.job_order || 999) - (b.job_order || 999)))
+  
+    // ✅ Archived jobs (today only)
+    const { data: archived, error: archivedErr } = await supabase
+      .from('archived_jobs')
+      .select('*')
+      .eq('driver_id', driver.id)
+      .eq('date_of_service', todayStr)
+      .order('archived_at', { ascending: false })
+
+    if (archivedErr) {
+      console.error('Fetch archived jobs failed:', archivedErr)
+      setArchivedJobs([])
+    } else {
+      setArchivedJobs(archived || [])
+    }
   }
 
   useEffect(() => {
@@ -82,6 +100,25 @@ export default function DriverDashboard() {
 
     fetchDriverJobs()
   }
+
+  const abortJob = async (jobId) => {
+    const ok = confirm('Abort this job? This will flag it as ABORTED until the office reviews it.')
+    if (!ok) return
+
+    const { error } = await supabase
+      .from('jobs')
+      .update({ job_aborted: true })
+      .eq('id', jobId)
+
+    if (error) {
+      console.error('Abort job error:', error)
+      alert('Failed to abort job.')
+      return
+    }
+
+    fetchDriverJobs()
+  }
+
 
   const toggleExpand = (jobId) => {
     setExpandedJobId(expandedJobId === jobId ? null : jobId)
@@ -132,6 +169,40 @@ export default function DriverDashboard() {
 
     generateWTNPDF(wtn)
   }
+
+    // ✅ Download WTN PDF for an archived job (today)
+    const handleDownloadArchivedWTN = async (archivedJob) => {
+      const originalJobId = archivedJob.original_job_id ?? archivedJob.id
+
+      // Try archived WTN first
+      let { data: wtn } = await supabase
+        .from('archived_waste_transfer_notes')
+        .select('*')
+        .eq('job_id', originalJobId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      // Fallback to live WTN just in case
+      if (!wtn) {
+        const res2 = await supabase
+          .from('waste_transfer_notes')
+          .select('*')
+          .eq('job_id', originalJobId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        wtn = res2.data
+      }
+
+      if (!wtn) {
+        alert('No WTN found for this archived job.')
+        return
+      }
+
+      generateWTNPDF(wtn)
+    }
 
   // Safety popup
   if (!acceptedWarning) {
@@ -189,7 +260,12 @@ export default function DriverDashboard() {
             jobs
               .filter(j => !j.job_complete)
               .map(job => (
-                <div key={job.id} className="card-glass mb-4 p-4">
+                <div
+                  key={job.id}
+                  className={`card-glass mb-4 p-4 ${
+                    job.job_aborted ? 'bg-red-200 border border-red-400' : ''
+                  }`}
+                >
                   <div className="flex justify-between items-center">
                     <div>
                       <p className="font-semibold">
@@ -255,29 +331,46 @@ export default function DriverDashboard() {
                         />
                       </div>
 
-                      {!job.waste_transfer_note_complete ? (
-                        <button
-                          className="btn btn-primary btn-md text-xs bg-yellow-500 hover:bg-yellow-600 mt-2"
-                          onClick={() => setShowWTNModalForJob(job.id)}
-                        >
-                          New WTN
-                        </button>
+                      {job.job_aborted ? (
+                        <div className="mt-2">
+                          <p className="text-sm font-semibold text-red-700">
+                            ⚠️ This job has been marked as ABORTED.
+                          </p>
+                        </div>
                       ) : (
-                        <button
-                          className="btn btn-primary btn-md text-xs bg-green-600 hover:bg-green-700 mt-2"
-                          onClick={() => markJobComplete(job.id)}
-                        >
-                          Mark Complete
-                        </button>
-                      )}
+                        <>
+                          {!job.waste_transfer_note_complete ? (
+                            <button
+                              className="btn btn-primary btn-md text-xs bg-yellow-500 hover:bg-yellow-600 mt-2"
+                              onClick={() => setShowWTNModalForJob(job.id)}
+                            >
+                              New WTN
+                            </button>
+                          ) : (
+                            <button
+                              className="btn btn-primary btn-md text-xs bg-green-600 hover:bg-green-700 mt-2"
+                              onClick={() => markJobComplete(job.id)}
+                            >
+                              Mark Complete
+                            </button>
+                          )}
 
-                      {!job.paid && (
-                        <button
-                          className="btn btn-primary btn-md text-xs bg-lime-400 hover:bg-lime-500 mt-2 ml-2"
-                          onClick={() => markJobPaid(job.id)}
-                        >
-                          Mark as Paid
-                        </button>
+                          {!job.paid && (
+                            <button
+                              className="btn btn-primary btn-md text-xs bg-lime-400 hover:bg-lime-500 mt-2 ml-2"
+                              onClick={() => markJobPaid(job.id)}
+                            >
+                              Mark as Paid
+                            </button>
+                          )}
+
+                          <button
+                            className="btn btn-primary btn-md text-xs bg-red-700 hover:bg-red-800 mt-2 ml-2"
+                            onClick={() => abortJob(job.id)}
+                          >
+                            Abort Job
+                          </button>
+                        </>
                       )}
                     </div>
                   )}
@@ -336,6 +429,51 @@ export default function DriverDashboard() {
                       </button>
                     </div>
                   )}
+                </div>
+              ))
+            )
+          )}
+        </div>
+        
+        {/* ✅ Archived Jobs (Today) */}
+        <div className="mb-8">
+          <h2
+            className="text-lg font-semibold mb-3 cursor-pointer underline"
+            onClick={() => setShowArchived(!showArchived)}
+          >
+            📦 Archived Jobs {showArchived ? '▲' : '▼'}
+          </h2>
+
+          {showArchived && (
+            archivedJobs.length === 0 ? (
+              <p className="text-gray-500">No archived jobs for today.</p>
+            ) : (
+              archivedJobs.map((job) => (
+                <div key={job.id} className="card-glass mb-4 p-4 opacity-90">
+                  <div className="flex justify-between items-center gap-4">
+                    <div>
+                      <p className="font-semibold">{job.job_type}</p>
+
+                      <p className="text-sm text-gray-600">
+                        {job.address_line_1 || '—'}
+                      </p>
+
+                      <p className="text-sm text-gray-600">
+                        {job.post_code || '—'}
+                      </p>
+
+                      <p className="text-sm text-gray-600">
+                        {job.mobile_number || job.telephone_number || '—'}
+                      </p>
+                    </div>
+
+                    <button
+                      className="btn btn-neutral btn-md text-xs"
+                      onClick={() => handleDownloadArchivedWTN(job)}
+                    >
+                      Download WTN PDF
+                    </button>
+                  </div>
                 </div>
               ))
             )

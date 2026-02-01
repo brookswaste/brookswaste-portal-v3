@@ -448,6 +448,7 @@ export default function Bookings() {
                 <th className="border px-3 py-2">Assigned Driver</th>
                 <th className="border px-3 py-2">Order</th>
                 <th className="border px-3 py-2">Job Complete</th>
+                <th className="border px-3 py-2">Aborted</th>
                 <th className="border px-3 py-2">Paid</th>
                 <th className="border px-3 py-2">Invoice Required</th>
                 <th className="border px-3 py-2">Invoice Sent</th>
@@ -460,7 +461,7 @@ export default function Bookings() {
                 <tr 
                   key={job.id}
                   className={`text-sm ${
-                    job.job_complete ? 'bg-green-50' : 'bg-orange-50'
+                    job.job_aborted ? 'bg-red-200' : job.job_complete ? 'bg-green-50' : 'bg-orange-50'
                   } hover:outline hover:outline-1 hover:outline-gray-300`}
                 >
                   <td className="border px-3 py-2">{job.id}</td>
@@ -510,6 +511,19 @@ export default function Bookings() {
                     >
                       <option value="Yes">Yes</option>
                       <option value="No">No</option>
+                    </select>
+                  </td>
+
+                  <td className="border px-3 py-2">
+                    <select
+                      className="p-1 rounded border"
+                      value={job.job_aborted ? 'Yes' : 'No'}
+                      onChange={(e) =>
+                        updateJobField(job.id, 'job_aborted', e.target.value === 'Yes')
+                      }
+                    >
+                      <option value="No">No</option>
+                      <option value="Yes">Yes</option>
                     </select>
                   </td>
 

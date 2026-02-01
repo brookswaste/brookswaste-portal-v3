@@ -370,8 +370,24 @@ export default async function generateWTNPDF(wtn, job = null) {
     doc.setDrawColor(RULE);
     doc.setLineWidth(0.2);
     doc.rect(MARGIN, y, CONTENT_W, boxHeight);
-    doc.text(commentLines, MARGIN + 3, y + 6);
+
+    // Draw each line manually so spacing is consistent and never looks "justified"
+    const textX = MARGIN + 3;
+    let textY = y + 6;
+
+    doc.setFont("helvetica", "normal"); // comments should be normal weight (optional)
+    doc.setFontSize(layout.valueSize);
+    doc.setTextColor(TEXT);
+
+    for (const line of commentLines) {
+      // safety: don't write past the box
+      if (textY > y + boxHeight - 3) break;
+      doc.text(line, textX, textY, { align: "left" });
+      textY += COMMENT_LINE_H;
+    }
+
     y += boxHeight + 6;
+
 
     // --- Footer / Terms ---
     doc.setTextColor(MUTED);
