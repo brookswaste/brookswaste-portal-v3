@@ -84,6 +84,8 @@ export default async function generateWTNPDF(wtn, job = null) {
       format: "a4",
     });
 
+    doc.setCharSpace(0);
+
     // Page metrics
     const MARGIN = 12;
     const PAGE_W = 210;
@@ -156,6 +158,60 @@ export default async function generateWTNPDF(wtn, job = null) {
       line(x, yCursor + 1.1, x + width, yCursor + 1.1);
       return yCursor + 2.2;
     };
+
+    // Convert messy textarea input to clean plain text (fixes spaced letters like "C a l l")
+    const toPlainText = (input) => {
+      if (input === null || input === undefined) return "";
+
+      let s = String(input);
+
+      // Unicode normalize
+      if (typeof s.normalize === "function") s = s.normalize("NFKC");
+
+      // Remove invisible characters (zero-width etc.)
+      s = s.replace(/[\u200B-\u200D\uFEFF]/g, "");
+
+      // Normalize strange spaces
+      s = s.replace(/\u00A0/g, " ").replace(/\u202F/g, " ").replace(/\u2007/g, " ");
+
+      // Normalize newlines
+      s = s.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+
+      // Collapse multiple spaces
+      s = s.replace(/\t/g, " ").replace(/[ ]{2,}/g, " ");
+
+      // Fix spaced-letter runs line-by-line: "C a l l  o u t" -> "Call out"
+      s = s
+        .split("\n")
+        .map((line) => {
+          const tokens = line.split(" ").filter(Boolean);
+          const out = [];
+          let i = 0;
+
+          while (i < tokens.length) {
+            if (tokens[i].length === 1) {
+              let j = i;
+              while (j < tokens.length && tokens[j].length === 1) j++;
+
+              const runLen = j - i;
+              if (runLen >= 3) {
+                out.push(tokens.slice(i, j).join(""));
+                i = j;
+                continue;
+              }
+            }
+
+            out.push(tokens[i]);
+            i++;
+          }
+
+          return out.join(" ").replace(/[ ]{2,}/g, " ").trim();
+        })
+        .join("\n");
+
+      return s.trim();
+    };
+
 
     // --- Header + Logo ---
     const logoDataUrl = await loadDataUrl("/images/brooks-logo.png");
@@ -349,39 +405,48 @@ export default async function generateWTNPDF(wtn, job = null) {
     // --- Additional Comments ---
     sectionHeader("Additional Comments");
 
-    const commentsText = (wtn.additional_comments || "").trim() || "-";
+    const commentsText = toPlainText(wtn.additional_comments || "") || "-";
 
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(layout.valueSize);
+    // Make comments smaller than main values (more text fits)
+    const COMMENTS_FONT = Math.max(7.4, layout.valueSize - 1.8);
+
+    // Line height tied to comment font size
+    const COMMENT_LINE_H = Math.max(3.6, COMMENTS_FONT * 0.45);
+
+    // Set font BEFORE splitting text so splitTextToSize matches rendering
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(COMMENTS_FONT);
     doc.setTextColor(TEXT);
+    doc.setCharSpace(0);
 
-    const COMMENT_LINE_H = Math.max(layout.lineGap + 1.6, 4.6);
-    const commentLines = doc.splitTextToSize(
-      commentsText,
-      CONTENT_W - 6
-    );
-    const boxHeight = Math.max(
+    // Wrap text to box width
+    const commentLines = doc.splitTextToSize(commentsText, CONTENT_W - 6);
+
+    // Calculate desired box height
+    let desiredBoxHeight = Math.max(
       layout.sigHeight,
       commentLines.length * COMMENT_LINE_H + 8
     );
 
+    // Clamp the box height so it can never exceed remaining page space
+    const MAX_BOX_H = Math.max(18, BOTTOM_SAFE - y - 18);
+    const boxHeight = Math.min(desiredBoxHeight, MAX_BOX_H);
+
+    // If even the clamped box can't fit, force overflow so the compact layout is tried
     if (wouldOverflow(boxHeight + 6)) return { doc, overflow: true };
 
+    // Draw box
     doc.setDrawColor(RULE);
     doc.setLineWidth(0.2);
     doc.rect(MARGIN, y, CONTENT_W, boxHeight);
 
-    // Draw each line manually so spacing is consistent and never looks "justified"
+    // Draw each line manually, strictly inside the box
     const textX = MARGIN + 3;
     let textY = y + 6;
-
-    doc.setFont("helvetica", "normal"); // comments should be normal weight (optional)
-    doc.setFontSize(layout.valueSize);
-    doc.setTextColor(TEXT);
+    const maxTextY = y + boxHeight - 4;
 
     for (const line of commentLines) {
-      // safety: don't write past the box
-      if (textY > y + boxHeight - 3) break;
+      if (textY > maxTextY) break;
       doc.text(line, textX, textY, { align: "left" });
       textY += COMMENT_LINE_H;
     }
