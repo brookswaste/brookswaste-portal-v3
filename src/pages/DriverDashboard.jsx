@@ -33,6 +33,9 @@ export default function DriverDashboard() {
     'job_cost_ex_vat',
     'payment_type',
     'job_notes',
+    'invoice_required',
+    'invoice_sent',
+    
   ])
 
   const fetchDriverJobs = async () => {
@@ -272,6 +275,13 @@ export default function DriverDashboard() {
                         {job.job_order ? `#${job.job_order} – ` : ''}{job.job_type}
                       </p>
                       <p className="text-sm text-gray-600">{job.post_code}</p>
+
+                      {job.what3words ? (
+                      <p className="text-sm text-gray-600">
+                        <strong>w3w:</strong> {job.what3words}
+                      </p>
+                      ) : null}
+
                       <p className="text-sm text-gray-600">{job.mobile_number}</p>
                     </div>
                     <button className="btn btn-primary btn-md text-xs" onClick={() => toggleExpand(job.id)}>
@@ -398,6 +408,13 @@ export default function DriverDashboard() {
                     <div>
                       <p className="font-semibold">{job.job_type}</p>
                       <p className="text-sm text-gray-600">{job.post_code}</p>
+
+                      {job.what3words ? (
+                      <p className="text-sm text-gray-600">
+                        <strong>w3w:</strong> {job.what3words}
+                      </p>
+                      ) : null}
+
                       <p className="text-sm text-gray-600">{job.mobile_number}</p>
                     </div>
                     <button className="btn btn-primary btn-md text-xs" onClick={() => toggleExpand(job.id)}>

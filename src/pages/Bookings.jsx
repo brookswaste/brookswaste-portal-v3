@@ -51,8 +51,31 @@ export default function Bookings() {
   }
 
   const fetchArchivedJobs = async () => {
-    const { data, error } = await supabase.from('archived_jobs').select('*')
-    if (!error) setArchivedJobs(data)
+    const all = []
+    let from = 0
+    const pageSize = 1000
+
+    while (true) {
+      const { data, error } = await supabase
+        .from('archived_jobs')
+        .select('*')
+        .order('archived_at', { ascending: false })
+        .range(from, from + pageSize - 1)
+
+      if (error) {
+        console.error('Fetch archived jobs failed:', error)
+        break
+      }
+
+      if (!data || data.length === 0) break
+
+      all.push(...data)
+
+      if (data.length < pageSize) break
+      from += pageSize
+    }
+
+    setArchivedJobs(all)
   }
 
   const fetchDrivers = async () => {
@@ -450,7 +473,6 @@ export default function Bookings() {
                 <th className="border px-3 py-2">Job Complete</th>
                 <th className="border px-3 py-2">Aborted</th>
                 <th className="border px-3 py-2">Paid</th>
-                <th className="border px-3 py-2">Invoice Required</th>
                 <th className="border px-3 py-2">Invoice Sent</th>
                 <th className="border px-3 py-2">Actions</th>
               </tr>
@@ -539,20 +561,7 @@ export default function Bookings() {
                       <option value="No">No</option>
                     </select>
                   </td>
-
-                  <td className="border px-3 py-2">
-                    <select
-                      className="p-1 rounded border"
-                      value={job.invoice_required ? 'Yes' : 'No'}
-                      onChange={(e) =>
-                        updateJobField(job.id, 'invoice_required', e.target.value === 'Yes')
-                      }
-                    >
-                      <option value="Yes">Yes</option>
-                      <option value="No">No</option>
-                    </select>
-                  </td>
-
+                  
                   <td className="border px-3 py-2">
                     <select
                       className="p-1 rounded border"
