@@ -348,7 +348,7 @@ export default function Bookings() {
     })
     .filter((job) => {
       if (!archivedJobIdSearch) return true
-      return String(job.id).includes(archivedJobIdSearch)
+      return String(job.original_job_id ?? job.id).includes(archivedJobIdSearch)
     })
 
   return (
@@ -705,6 +705,7 @@ export default function Bookings() {
                     <th className="border px-3 py-2">Date of Service</th>
                     <th className="border px-3 py-2">Assigned Driver</th>
                     <th className="border px-3 py-2">Job Complete</th>
+                    <th className="border px-3 py-2">Aborted</th>
                     <th className="border px-3 py-2">Payment Type</th>
                     <th className="border px-3 py-2">Paid</th>
                     <th className="border px-3 py-2">Actions</th>
@@ -714,12 +715,13 @@ export default function Bookings() {
                 <tbody>
                   {filteredArchivedJobs.map((job) => (
                     <tr key={job.id} className="text-sm hover:bg-pink-50">
-                      <td className="border px-3 py-2">{job.id}</td>
+                      <td className="border px-3 py-2">{job.original_job_id ?? job.id}</td>
                       <td className="border px-3 py-2">{job.job_type}</td>
                       <td className="border px-3 py-2">{job.post_code}</td>
                       <td className="border px-3 py-2">{job.date_of_service}</td>
                       <td className="border px-3 py-2">{getDriverName(job.driver_id)}</td>
                       <td className="border px-3 py-2">{job.job_complete ? 'Yes' : 'No'}</td>
+                      <td className="border px-3 py-2">{job.job_aborted ? 'Yes' : 'No'}</td>
                       <td className="border px-3 py-2">{job.payment_type}</td>
                       <td className="border px-3 py-2">{job.paid ? 'Yes' : 'No'}</td>
 
@@ -769,7 +771,7 @@ export default function Bookings() {
 
                   {filteredArchivedJobs.length === 0 && (
                     <tr>
-                      <td className="px-3 py-6 text-center text-gray-500" colSpan={9}>
+                      <td className="px-3 py-6 text-center text-gray-500" colSpan={10}>
                         No archived jobs match your filters.
                       </td>
                     </tr>
