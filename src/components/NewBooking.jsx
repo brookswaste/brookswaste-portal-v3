@@ -156,11 +156,13 @@ export function NewBookingModal({ onClose, onSave }) {
                   <option value="CCTV">CCTV</option>
                   <option value="Portaloo">Portaloo</option>
                   <option value="Service">Service</option>
+                  <option value="Road Sweeper">Road Sweeper</option>
                   <option value="Other">Other</option>
                   <option value="CALL OUT Tanker">CALL OUT Tanker</option>
                   <option value="CALL OUT Blockage">CALL OUT Blockage</option>
                   <option value="CALL OUT CCTV">CALL OUT CCTV</option>
                   <option value="CALL OUT Portaloo">CALL OUT Portaloo</option>
+                  <option value="CALL OUT Road Sweeper">CALL OUT Road Sweeper</option>
                   <option value="CALL OUT Service">CALL OUT Service</option>
                   <option value="CALL OUT Other">CALL OUT Other</option>
                 </select>

@@ -15,6 +15,8 @@ export default function Bookings() {
   const [jobs, setJobs] = useState([])
   const [archivedJobs, setArchivedJobs] = useState([])
   const [drivers, setDrivers] = useState([])
+  const [jobDriverAssignments, setJobDriverAssignments] = useState({})
+  const [driverAssignmentDraft, setDriverAssignmentDraft] = useState([])
   const [wtns, setWTNs] = useState({})
   const [searchTerm, setSearchTerm] = useState('')
   const [archivedSearch, setArchivedSearch] = useState('')
@@ -39,6 +41,7 @@ export default function Bookings() {
     fetchJobs()
     fetchArchivedJobs()
     fetchDrivers()
+    fetchDriverAssignments()
     fetchWTNs()
   }, [])
 
@@ -83,6 +86,26 @@ export default function Bookings() {
     if (!error) setDrivers(data)
   }
 
+  const fetchDriverAssignments = async () => {
+    const { data, error } = await supabase
+      .from('job_driver_assignments')
+      .select('job_id, driver_id')
+
+    if (error) {
+      console.warn('Fetch driver assignments failed:', error)
+      setJobDriverAssignments({})
+      return
+    }
+
+    const map = {}
+    ;(data || []).forEach((assignment) => {
+      if (!map[assignment.job_id]) map[assignment.job_id] = []
+      map[assignment.job_id].push(assignment.driver_id)
+    })
+
+    setJobDriverAssignments(map)
+  }
+
   const fetchWTNs = async () => {
     const { data, error } = await supabase.from('waste_transfer_notes').select('id, job_id')
     if (!error) {
@@ -97,6 +120,82 @@ export default function Bookings() {
   const getDriverName = (id) => {
     const driver = drivers.find((d) => d.id === id)
     return driver ? driver.name : '-'
+  }
+
+  const getAssignedDriverIds = (job) => {
+    const assignedIds = jobDriverAssignments[job.id] || []
+    if (assignedIds.length > 0) return assignedIds
+    return job.driver_id ? [job.driver_id] : []
+  }
+
+  const getAssignedDriverNames = (job) => {
+    const names = getAssignedDriverIds(job)
+      .map((driverId) => getDriverName(driverId))
+      .filter((name) => name && name !== '-')
+
+    return names.length > 0 ? names.join(', ') : '-'
+  }
+
+  const openAssignDrivers = (job) => {
+    setSelectedJob(job)
+    setDriverAssignmentDraft(getAssignedDriverIds(job))
+    setActiveModal('assignDrivers')
+  }
+
+  const toggleDriverAssignment = (driverId) => {
+    setDriverAssignmentDraft((current) =>
+      current.includes(driverId)
+        ? current.filter((id) => id !== driverId)
+        : [...current, driverId]
+    )
+  }
+
+  const saveDriverAssignments = async () => {
+    if (!selectedJob) return
+
+    const { error: deleteError } = await supabase
+      .from('job_driver_assignments')
+      .delete()
+      .eq('job_id', selectedJob.id)
+
+    if (deleteError) {
+      console.error('Delete driver assignments failed:', deleteError)
+      alert('Could not update driver assignments. Has the new Supabase table been created?')
+      return
+    }
+
+    if (driverAssignmentDraft.length > 0) {
+      const rows = driverAssignmentDraft.map((driverId) => ({
+        job_id: selectedJob.id,
+        driver_id: driverId,
+      }))
+
+      const { error: insertError } = await supabase
+        .from('job_driver_assignments')
+        .insert(rows)
+
+      if (insertError) {
+        console.error('Insert driver assignments failed:', insertError)
+        alert('Could not save driver assignments.')
+        return
+      }
+    }
+
+    const { error: jobUpdateError } = await supabase
+      .from('jobs')
+      .update({ driver_id: driverAssignmentDraft[0] || null })
+      .eq('id', selectedJob.id)
+
+    if (jobUpdateError) {
+      console.error('Update lead driver failed:', jobUpdateError)
+      alert('Driver assignments saved, but the lead driver could not be updated.')
+    }
+
+    setActiveModal(null)
+    setSelectedJob(null)
+    setDriverAssignmentDraft([])
+    fetchJobs()
+    fetchDriverAssignments()
   }
 
   const updateAssignedDriver = async (jobId, driverId) => {
@@ -186,6 +285,24 @@ export default function Bookings() {
       archivedJobId = fallback.id;
     }
 
+    const assignedDriverIds = getAssignedDriverIds(job);
+
+    if (assignedDriverIds.length > 0) {
+      const { error: archiveDriverAssignmentsErr } = await supabase
+        .from('archived_job_driver_assignments')
+        .insert(
+          assignedDriverIds.map((driverId) => ({
+            archived_job_id: archivedJobId,
+            original_job_id: originalJobId,
+            driver_id: driverId,
+          }))
+        );
+
+      if (archiveDriverAssignmentsErr) {
+        console.warn('[Archive] Driver assignments were not copied:', archiveDriverAssignmentsErr);
+      }
+    }
+
     // 2) Copy WTNs into archived table
     const { data: wtNotes, error: wtnFetchErr } = await supabase
       .from('waste_transfer_notes')
@@ -243,6 +360,7 @@ export default function Bookings() {
     // 4) Refresh UI
     fetchJobs();
     fetchArchivedJobs();
+    fetchDriverAssignments();
   };
 
   const handleEdit = (job) => {
@@ -288,6 +406,45 @@ export default function Bookings() {
     navigate('/')
   }
 
+  const formatDateForInput = (date) => {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+
+  const getDateFromToday = (daysToAdd) => {
+    const date = new Date()
+    date.setDate(date.getDate() + daysToAdd)
+    return formatDateForInput(date)
+  }
+
+  const formatDateLabel = (dateString) => {
+    if (!dateString) return ''
+
+    return new Date(`${dateString}T00:00:00`).toLocaleDateString('en-GB', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+    })
+  }
+
+  const countIncompleteJobsForDate = (dateString) =>
+    jobs.filter((job) => job.date_of_service === dateString && job.job_complete !== true).length
+
+  const dailyJobCounts = [
+    { label: 'Today', date: getDateFromToday(0) },
+    { label: 'Tomorrow', date: getDateFromToday(1) },
+    { label: 'Day After', date: getDateFromToday(2) },
+  ].map((item) => ({
+    ...item,
+    count: countIncompleteJobsForDate(item.date),
+  }))
+
+  const selectedDateJobCount = selectedDateFilter
+    ? countIncompleteJobsForDate(selectedDateFilter)
+    : null
+
   const filteredJobs = jobs
     .filter((job) =>
       Object.values(job).some((val) =>
@@ -304,15 +461,15 @@ export default function Bookings() {
     })
     .filter((job) => {
       if (!selectedDriverFilter) return true
-      return job.driver_id === selectedDriverFilter
+      return getAssignedDriverIds(job).includes(selectedDriverFilter)
     })
     .filter((job) => {
       if (!selectedDateFilter) return true
       return job.date_of_service === selectedDateFilter
     })
     .sort((a, b) => {
-      const driverA = getDriverName(a.driver_id).toLowerCase()
-      const driverB = getDriverName(b.driver_id).toLowerCase()
+      const driverA = getAssignedDriverNames(a).toLowerCase()
+      const driverB = getAssignedDriverNames(b).toLowerCase()
       return driverA.localeCompare(driverB)
     })
     .filter((job) => {
@@ -389,6 +546,58 @@ export default function Bookings() {
         <div className="text-sm text-gray-500">
           <button onClick={() => navigate('/bookings')} className="hover:underline">
           </button>
+        </div>
+
+        {/* Daily Job Counts */}
+        <div className="rounded-2xl bg-white shadow-sm border p-4">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 lg:col-span-3">
+              {dailyJobCounts.map(({ label, date, count }) => (
+                <button
+                  key={date}
+                  type="button"
+                  onClick={() => setSelectedDateFilter(date)}
+                  className={`text-left rounded-xl border p-3 transition hover:border-pink-400 hover:bg-pink-50 ${
+                    selectedDateFilter === date
+                      ? 'border-pink-500 bg-pink-50 shadow-sm'
+                      : 'border-gray-200 bg-white'
+                  }`}
+                >
+                  <span className="block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    {label}
+                  </span>
+                  <span className="mt-1 block text-sm font-medium text-gray-700">
+                    {formatDateLabel(date)}
+                  </span>
+                  <span className="mt-2 block text-2xl font-bold text-black">
+                    {count} {count === 1 ? 'job' : 'jobs'}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            <div className="rounded-xl border border-gray-200 p-3">
+              <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Selected Date
+              </label>
+              <input
+                type="date"
+                className="mt-2 w-full p-2 rounded border focus:outline-none focus:ring-2 focus:ring-pink-400"
+                value={selectedDateFilter}
+                onChange={(e) => setSelectedDateFilter(e.target.value)}
+              />
+              <div className="mt-2 text-sm font-medium text-gray-700">
+                {selectedDateFilter ? (
+                  <>
+                    <span className="font-bold text-black">{selectedDateJobCount}</span>{' '}
+                    {selectedDateJobCount === 1 ? 'job' : 'jobs'}
+                  </>
+                ) : (
+                  'Choose a date'
+                )}
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Search + Filters */}
@@ -468,7 +677,7 @@ export default function Bookings() {
                 <th className="border px-3 py-2">Job Cost</th>
                 <th className="border px-3 py-2">Billing Account</th>
                 <th className="border px-3 py-2">Date of Service</th>
-                <th className="border px-3 py-2">Assigned Driver</th>
+                <th className="border px-3 py-2">Assigned Drivers</th>
                 <th className="border px-3 py-2">Order</th>
                 <th className="border px-3 py-2">Job Complete</th>
                 <th className="border px-3 py-2">Aborted</th>
@@ -494,18 +703,19 @@ export default function Bookings() {
                   <td className="border px-3 py-2">{job.invoice_address || '-'}</td>
                   <td className="border px-3 py-2">{job.date_of_service}</td>
 
-                  {/* Driver assign */}
+                  {/* Driver assignments */}
                   <td className="border px-3 py-2">
-                    <select
-                      className="p-1 rounded border"
-                      value={job.driver_id || ''}
-                      onChange={(e) => updateAssignedDriver(job.id, e.target.value)}
-                    >
-                      <option value="">Select Driver</option>
-                      {drivers.map((driver) => (
-                        <option key={driver.id} value={driver.id}>{driver.name}</option>
-                      ))}
-                    </select>
+                    <div className="w-48 space-y-2">
+                      <div className="text-xs text-gray-700">
+                        {getAssignedDriverNames(job)}
+                      </div>
+                      <button
+                        className="btn btn-neutral btn-xs"
+                        onClick={() => openAssignDrivers(job)}
+                      >
+                        Assign Drivers
+                      </button>
+                    </div>
                   </td>
 
                   {/* Job Order */}
@@ -834,6 +1044,67 @@ export default function Bookings() {
           onClose={() => setActiveModal(null)}
           onSave={fetchArchivedJobs}
         />
+      )}
+
+      {activeModal === 'assignDrivers' && selectedJob && (
+        <div className="modal-overlay">
+          <div className="modal-glass max-w-md">
+            <div className="flex items-start justify-between gap-4 mb-4">
+              <div>
+                <h2 className="text-xl font-bold text-black">Assign Drivers</h2>
+                <p className="text-sm text-gray-600">
+                  Job {selectedJob.id} - {selectedJob.job_type || 'Booking'}
+                </p>
+              </div>
+              <button
+                className="btn btn-neutral btn-sm"
+                onClick={() => {
+                  setActiveModal(null)
+                  setSelectedJob(null)
+                  setDriverAssignmentDraft([])
+                }}
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+              {drivers.map((driver) => (
+                <label
+                  key={driver.id}
+                  className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 p-3 hover:bg-pink-50"
+                >
+                  <span className="text-sm font-medium text-gray-800">{driver.name}</span>
+                  <input
+                    type="checkbox"
+                    checked={driverAssignmentDraft.includes(driver.id)}
+                    onChange={() => toggleDriverAssignment(driver.id)}
+                    className="h-5 w-5 accent-pink-500"
+                  />
+                </label>
+              ))}
+
+              {drivers.length === 0 && (
+                <p className="text-sm text-gray-500">No drivers found.</p>
+              )}
+            </div>
+
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <button
+                className="btn btn-neutral btn-md"
+                onClick={() => setDriverAssignmentDraft([])}
+              >
+                Clear
+              </button>
+              <button
+                className="btn btn-primary btn-md"
+                onClick={saveDriverAssignments}
+              >
+                Save Drivers
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {activeModal === 'add' && (

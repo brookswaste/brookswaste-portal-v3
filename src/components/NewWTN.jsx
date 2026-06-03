@@ -322,6 +322,32 @@ export default function NewWTN({ jobId, onClose, onSubmit, singleColumn = false 
     setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
+  const blurFocusedTextField = () => {
+    const activeElement = document.activeElement
+    if (!activeElement) return
+
+    const tagName = activeElement.tagName
+    if (tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT') {
+      activeElement.blur()
+    }
+  }
+
+  const getSignatureCanvasProps = (label) => ({
+    width: 400,
+    height: 150,
+    className: 'border rounded',
+    tabIndex: -1,
+    inputMode: 'none',
+    role: 'img',
+    'aria-label': `${label} signature pad`,
+    style: {
+      touchAction: 'none',
+      userSelect: 'none',
+      WebkitUserSelect: 'none',
+    },
+    onFocus: (e) => e.currentTarget.blur(),
+  })
+
   const uploadSignature = async (canvasRef, label) => {
     if (!canvasRef.current || canvasRef.current.isEmpty()) return null
     const signatureDataUrl = canvasRef.current.toDataURL()
@@ -654,11 +680,18 @@ export default function NewWTN({ jobId, onClose, onSubmit, singleColumn = false 
               className="border rounded w-64"
             />
           ) : (
-            <SignatureCanvas
-              ref={operativeSigCanvas}
-              penColor="black"
-              canvasProps={{ width: 400, height: 150, className: 'border rounded' }}
-            />
+            <div
+              className="inline-block max-w-full"
+              onMouseDown={blurFocusedTextField}
+              onPointerDown={blurFocusedTextField}
+              onTouchStart={blurFocusedTextField}
+            >
+              <SignatureCanvas
+                ref={operativeSigCanvas}
+                penColor="black"
+                canvasProps={getSignatureCanvasProps('Operative')}
+              />
+            </div>
           )}
         </div>
 
@@ -671,11 +704,18 @@ export default function NewWTN({ jobId, onClose, onSubmit, singleColumn = false 
               className="border rounded w-64"
             />
           ) : (
-            <SignatureCanvas
-              ref={customerSigCanvas}
-              penColor="black"
-              canvasProps={{ width: 400, height: 150, className: 'border rounded' }}
-            />
+            <div
+              className="inline-block max-w-full"
+              onMouseDown={blurFocusedTextField}
+              onPointerDown={blurFocusedTextField}
+              onTouchStart={blurFocusedTextField}
+            >
+              <SignatureCanvas
+                ref={customerSigCanvas}
+                penColor="black"
+                canvasProps={getSignatureCanvasProps('Customer')}
+              />
+            </div>
           )}
         </div>
 

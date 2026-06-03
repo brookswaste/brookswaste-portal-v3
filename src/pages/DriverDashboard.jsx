@@ -38,6 +38,13 @@ export default function DriverDashboard() {
     
   ])
 
+  const PHONE_KEYS = new Set([
+    'mobile_number',
+    'telephone_number',
+    'on_site_contact_number',
+    'client_telephone',
+  ])
+
   const fetchDriverJobs = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
@@ -53,16 +60,90 @@ export default function DriverDashboard() {
 
     const todayStr = new Date().toISOString().split('T')[0]
 
-    const { data: activeJobs } = await supabase
+    const mergeUniqueJobs = (...jobGroups) => {
+      const map = new Map()
+
+      jobGroups.flat().filter(Boolean).forEach((job) => {
+        map.set(job.id, job)
+      })
+
+      return Array.from(map.values())
+    }
+
+    let assignedActiveJobs = []
+
+    const { data: assignments, error: assignmentsErr } = await supabase
+      .from('job_driver_assignments')
+      .select('job_id')
+      .eq('driver_id', driver.id)
+
+    if (assignmentsErr) {
+      console.warn('Fetch job driver assignments failed:', assignmentsErr)
+    } else {
+      const assignedJobIds = [...new Set((assignments || []).map((assignment) => assignment.job_id))]
+
+      if (assignedJobIds.length > 0) {
+        const { data, error } = await supabase
+          .from('jobs')
+          .select('*')
+          .in('id', assignedJobIds)
+          .eq('date_of_service', todayStr)
+
+        if (error) {
+          console.error('Fetch assigned jobs failed:', error)
+        } else {
+          assignedActiveJobs = data || []
+        }
+      }
+    }
+
+    const { data: legacyActiveJobs, error: legacyActiveErr } = await supabase
       .from('jobs')
       .select('*')
       .eq('driver_id', driver.id)
       .eq('date_of_service', todayStr)
 
-    setJobs((activeJobs || []).sort((a, b) => (a.job_order || 999) - (b.job_order || 999)))
-  
-    // ✅ Archived jobs (today only)
-    const { data: archived, error: archivedErr } = await supabase
+    if (legacyActiveErr) {
+      console.error('Fetch legacy driver jobs failed:', legacyActiveErr)
+    }
+
+    setJobs(
+      mergeUniqueJobs(assignedActiveJobs, legacyActiveJobs || [])
+        .sort((a, b) => (a.job_order || 999) - (b.job_order || 999))
+    )
+
+    let assignedArchivedJobs = []
+
+    const { data: archivedAssignments, error: archivedAssignmentsErr } = await supabase
+      .from('archived_job_driver_assignments')
+      .select('archived_job_id')
+      .eq('driver_id', driver.id)
+
+    if (archivedAssignmentsErr) {
+      console.warn('Fetch archived driver assignments failed:', archivedAssignmentsErr)
+    } else {
+      const archivedJobIds = [
+        ...new Set((archivedAssignments || []).map((assignment) => assignment.archived_job_id).filter(Boolean)),
+      ]
+
+      if (archivedJobIds.length > 0) {
+        const { data, error } = await supabase
+          .from('archived_jobs')
+          .select('*')
+          .in('id', archivedJobIds)
+          .eq('date_of_service', todayStr)
+          .order('archived_at', { ascending: false })
+
+        if (error) {
+          console.error('Fetch assigned archived jobs failed:', error)
+        } else {
+          assignedArchivedJobs = data || []
+        }
+      }
+    }
+
+    // Archived jobs (today only)
+    const { data: legacyArchivedJobs, error: archivedErr } = await supabase
       .from('archived_jobs')
       .select('*')
       .eq('driver_id', driver.id)
@@ -71,10 +152,12 @@ export default function DriverDashboard() {
 
     if (archivedErr) {
       console.error('Fetch archived jobs failed:', archivedErr)
-      setArchivedJobs([])
-    } else {
-      setArchivedJobs(archived || [])
     }
+
+    setArchivedJobs(
+      mergeUniqueJobs(assignedArchivedJobs, legacyArchivedJobs || [])
+        .sort((a, b) => new Date(b.archived_at || 0) - new Date(a.archived_at || 0))
+    )
   }
 
   useEffect(() => {
@@ -131,6 +214,38 @@ export default function DriverDashboard() {
     if (val === true) return '✅'
     if (val === false) return '❌'
     return '–'
+  }
+
+  const getPhoneHref = (phone) => {
+    const phoneText = String(phone || '').trim()
+    if (!phoneText) return ''
+
+    const normalisedPhone = phoneText.replace(/[^\d+]/g, '')
+    return normalisedPhone ? `tel:${normalisedPhone}` : ''
+  }
+
+  const renderPhoneLink = (phone) => {
+    const phoneText = String(phone || '').trim()
+    const phoneHref = getPhoneHref(phoneText)
+
+    if (!phoneHref) return '–'
+
+    return (
+      <a
+        href={phoneHref}
+        className="text-pink-600 underline font-medium"
+        aria-label={`Call ${phoneText}`}
+      >
+        {phoneText}
+      </a>
+    )
+  }
+
+  const renderJobValue = (key, value) => {
+    if (typeof value === 'boolean') return renderBoolIcon(value)
+    if (value === null || value === '') return '–'
+    if (PHONE_KEYS.has(key)) return renderPhoneLink(value)
+    return String(value)
   }
 
   const openEditWTN = async (jobId) => {
@@ -282,7 +397,9 @@ export default function DriverDashboard() {
                       </p>
                       ) : null}
 
-                      <p className="text-sm text-gray-600">{job.mobile_number}</p>
+                      <p className="text-sm text-gray-600">
+                        {renderPhoneLink(job.mobile_number || job.telephone_number || job.on_site_contact_number)}
+                      </p>
                     </div>
                     <button className="btn btn-primary btn-md text-xs" onClick={() => toggleExpand(job.id)}>
                       {expandedJobId === job.id ? 'Hide Details' : 'View Details'}
@@ -296,11 +413,7 @@ export default function DriverDashboard() {
                         return (
                           <p key={key}>
                             <strong>{key.replace(/_/g, ' ')}:</strong>{' '}
-                            {typeof value === 'boolean'
-                              ? renderBoolIcon(value)
-                              : value === null || value === ''
-                              ? '–'
-                              : String(value)}
+                            {renderJobValue(key, value)}
                           </p>
                         )
                       })}
@@ -415,7 +528,9 @@ export default function DriverDashboard() {
                       </p>
                       ) : null}
 
-                      <p className="text-sm text-gray-600">{job.mobile_number}</p>
+                      <p className="text-sm text-gray-600">
+                        {renderPhoneLink(job.mobile_number || job.telephone_number || job.on_site_contact_number)}
+                      </p>
                     </div>
                     <button className="btn btn-primary btn-md text-xs" onClick={() => toggleExpand(job.id)}>
                       {expandedJobId === job.id ? 'Hide Details' : 'View Details'}
@@ -429,11 +544,7 @@ export default function DriverDashboard() {
                         return (
                           <p key={key}>
                             <strong>{key.replace(/_/g, ' ')}:</strong>{' '}
-                            {typeof value === 'boolean'
-                              ? renderBoolIcon(value)
-                              : value === null || value === ''
-                              ? '–'
-                              : String(value)}
+                            {renderJobValue(key, value)}
                           </p>
                         )
                       })}
@@ -480,7 +591,7 @@ export default function DriverDashboard() {
                       </p>
 
                       <p className="text-sm text-gray-600">
-                        {job.mobile_number || job.telephone_number || '—'}
+                        {renderPhoneLink(job.mobile_number || job.telephone_number || job.on_site_contact_number)}
                       </p>
                     </div>
 

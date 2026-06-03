@@ -102,6 +102,7 @@ const SIC_OPTIONS = [
 // ▼ Disposal site options
 const DISPOSAL_ADDRESS_OPTIONS = [
   'N/A',
+  'Clearaway Recycling - SS13 1DH, Archers Fields, Basildon, Essex',
   'Anglian Water - NR17 1AW, Attleborough WRC, Long Street, Attlebrough, Norfolk',
   'Anglian Water - SS13 1DB, Basildon WRC, Courtauld Road, Basildon, Essex',
   'Anglian Water - MK41 9RZ, Bedford WRC, Bakers Lane, Bedford, Bedfordshire',
