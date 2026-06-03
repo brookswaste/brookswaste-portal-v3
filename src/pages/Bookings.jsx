@@ -35,6 +35,8 @@ export default function Bookings() {
   const [selectedDateFilter, setSelectedDateFilter] = useState('')
   const [jobIdSearch, setJobIdSearch] = useState('')
   const [archivedJobIdSearch, setArchivedJobIdSearch] = useState('')
+  const [duplicateBookingDate, setDuplicateBookingDate] = useState('')
+  const [duplicateBookingSaving, setDuplicateBookingSaving] = useState(false)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -241,6 +243,116 @@ export default function Bookings() {
       .eq('id', jobId)
 
     if (!error) fetchJobs()
+  }
+
+  const openDuplicateArchivedBooking = (job) => {
+    setSelectedJob(job)
+    setDuplicateBookingDate(formatDateForInput(new Date()))
+    setActiveModal('duplicateArchivedBooking')
+  }
+
+  const closeDuplicateArchivedBooking = () => {
+    setActiveModal(null)
+    setSelectedJob(null)
+    setDuplicateBookingDate('')
+    setDuplicateBookingSaving(false)
+  }
+
+  const getArchivedAssignedDriverIds = async (archivedJob) => {
+    const fallbackDriverIds = archivedJob.driver_id ? [archivedJob.driver_id] : []
+
+    const { data, error } = await supabase
+      .from('archived_job_driver_assignments')
+      .select('driver_id')
+      .eq('archived_job_id', archivedJob.id)
+
+    if (error) {
+      console.warn('Fetch archived driver assignments failed:', error)
+      return fallbackDriverIds
+    }
+
+    const assignedDriverIds = [...new Set((data || []).map((assignment) => assignment.driver_id))]
+    return assignedDriverIds.length > 0 ? assignedDriverIds : fallbackDriverIds
+  }
+
+  const buildDuplicatedBookingPayload = (archivedJob, dateOfService, assignedDriverIds) => {
+    const payload = { ...archivedJob }
+
+    delete payload.id
+    delete payload.original_job_id
+    delete payload.archived_at
+    delete payload.archived_date_of_service
+    delete payload.created_at
+    delete payload.updated_at
+
+    payload.date_of_service = dateOfService
+    payload.date_of_collection = null
+    payload.driver_id = assignedDriverIds[0] || archivedJob.driver_id || null
+    payload.job_order = null
+    payload.job_complete = false
+    payload.job_aborted = false
+    payload.waste_transfer_note_complete = false
+    payload.paid = false
+    payload.invoice_sent = false
+    payload.date_invoice_sent = null
+
+    if ('job_abort_reason' in archivedJob) payload.job_abort_reason = null
+    if ('job_aborted_at' in archivedJob) payload.job_aborted_at = null
+    if ('job_aborted_by' in archivedJob) payload.job_aborted_by = null
+
+    Object.keys(payload).forEach((key) => {
+      if (payload[key] === '') payload[key] = null
+    })
+
+    return payload
+  }
+
+  const saveDuplicatedArchivedBooking = async () => {
+    if (!selectedJob) return
+
+    if (!duplicateBookingDate) {
+      alert('Please choose the new date of service.')
+      return
+    }
+
+    setDuplicateBookingSaving(true)
+
+    const assignedDriverIds = await getArchivedAssignedDriverIds(selectedJob)
+    const payload = buildDuplicatedBookingPayload(selectedJob, duplicateBookingDate, assignedDriverIds)
+
+    const { data: newJob, error } = await supabase
+      .from('jobs')
+      .insert([payload])
+      .select('id')
+      .single()
+
+    if (error) {
+      console.error('Duplicate archived booking failed:', error)
+      alert('Could not duplicate this archived job.')
+      setDuplicateBookingSaving(false)
+      return
+    }
+
+    if (newJob?.id && assignedDriverIds.length > 0) {
+      const { error: assignmentError } = await supabase
+        .from('job_driver_assignments')
+        .insert(
+          assignedDriverIds.map((driverId) => ({
+            job_id: newJob.id,
+            driver_id: driverId,
+          }))
+        )
+
+      if (assignmentError) {
+        console.warn('Duplicate booking created, but driver assignments were not copied:', assignmentError)
+      }
+    }
+
+    closeDuplicateArchivedBooking()
+    setShowArchived(false)
+    setSelectedDateFilter(duplicateBookingDate)
+    fetchJobs()
+    fetchDriverAssignments()
   }
 
   const handleNewWTN = async (job) => {
@@ -985,6 +1097,13 @@ export default function Bookings() {
                           </button>
 
                           <button
+                            className="btn btn-primary btn-xs"
+                            onClick={() => openDuplicateArchivedBooking(job)}
+                          >
+                            Duplicate
+                          </button>
+
+                          <button
                             className="btn btn-neutral btn-xs"
                             onClick={async () => {
                               const { data: archivedWTN } = await supabase
@@ -1074,6 +1193,63 @@ export default function Bookings() {
           onClose={() => setActiveModal(null)}
           onSave={fetchArchivedJobs}
         />
+      )}
+
+      {activeModal === 'duplicateArchivedBooking' && selectedJob && (
+        <div className="modal-overlay">
+          <div className="modal-glass max-w-md">
+            <h2 className="text-xl font-bold text-black mb-2">Duplicate Booking</h2>
+            <div className="text-sm text-gray-700 space-y-1 mb-4">
+              <p>
+                <strong>Archived Job:</strong> {selectedJob.original_job_id ?? selectedJob.id}
+              </p>
+              <p>
+                <strong>Job Type:</strong> {selectedJob.job_type || '-'}
+              </p>
+              <p>
+                <strong>Customer:</strong> {selectedJob.customer_name || selectedJob.company_name || '-'}
+              </p>
+              <p>
+                <strong>Postcode:</strong> {selectedJob.post_code || '-'}
+              </p>
+              <p>
+                <strong>Old Date:</strong> {selectedJob.date_of_service || '-'}
+              </p>
+            </div>
+
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              New Date of Service
+            </label>
+            <input
+              type="date"
+              className="w-full p-2 rounded border focus:outline-none focus:ring-2 focus:ring-pink-400"
+              value={duplicateBookingDate}
+              onChange={(e) => setDuplicateBookingDate(e.target.value)}
+            />
+
+            <p className="mt-3 text-xs text-gray-500">
+              This creates a new live booking and resets completion, aborted, paid, invoice sent,
+              WTN complete, and job order.
+            </p>
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                className="btn btn-neutral btn-md"
+                onClick={closeDuplicateArchivedBooking}
+                disabled={duplicateBookingSaving}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn btn-primary btn-md"
+                onClick={saveDuplicatedArchivedBooking}
+                disabled={duplicateBookingSaving}
+              >
+                {duplicateBookingSaving ? 'Creating...' : 'Create Booking'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {activeModal === 'assignDrivers' && selectedJob && (
