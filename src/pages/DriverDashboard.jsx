@@ -17,6 +17,9 @@ export default function DriverDashboard() {
   const [acceptedWarning, setAcceptedWarning] = useState(false)
   const [archivedJobs, setArchivedJobs] = useState([])
   const [showArchived, setShowArchived] = useState(false)
+  const [abortJobTarget, setAbortJobTarget] = useState(null)
+  const [abortReason, setAbortReason] = useState('')
+  const [abortSaving, setAbortSaving] = useState(false)
 
 
   // 🔒 Keys to hide in BOTH sections
@@ -35,6 +38,9 @@ export default function DriverDashboard() {
     'job_notes',
     'invoice_required',
     'invoice_sent',
+    'job_abort_reason',
+    'job_aborted_at',
+    'job_aborted_by',
     
   ])
 
@@ -187,21 +193,49 @@ export default function DriverDashboard() {
     fetchDriverJobs()
   }
 
-  const abortJob = async (jobId) => {
-    const ok = confirm('Abort this job? This will flag it as ABORTED until the office reviews it.')
-    if (!ok) return
+  const openAbortJobModal = (job) => {
+    setAbortJobTarget(job)
+    setAbortReason(job.job_abort_reason || '')
+  }
+
+  const closeAbortJobModal = () => {
+    setAbortJobTarget(null)
+    setAbortReason('')
+    setAbortSaving(false)
+  }
+
+  const abortJob = async () => {
+    const reason = abortReason.trim()
+
+    if (!abortJobTarget) return
+
+    if (!reason) {
+      alert('Please enter a reason before aborting this job.')
+      return
+    }
+
+    setAbortSaving(true)
+
+    const { data: authData } = await supabase.auth.getUser()
 
     const { error } = await supabase
       .from('jobs')
-      .update({ job_aborted: true })
-      .eq('id', jobId)
+      .update({
+        job_aborted: true,
+        job_abort_reason: reason,
+        job_aborted_at: new Date().toISOString(),
+        job_aborted_by: authData?.user?.id || null,
+      })
+      .eq('id', abortJobTarget.id)
 
     if (error) {
       console.error('Abort job error:', error)
       alert('Failed to abort job.')
+      setAbortSaving(false)
       return
     }
 
+    closeAbortJobModal()
     fetchDriverJobs()
   }
 
@@ -400,6 +434,12 @@ export default function DriverDashboard() {
                       <p className="text-sm text-gray-600">
                         {renderPhoneLink(job.mobile_number || job.telephone_number || job.on_site_contact_number)}
                       </p>
+
+                      {job.job_aborted && job.job_abort_reason ? (
+                        <p className="mt-2 text-sm font-medium text-red-700">
+                          Abort reason: {job.job_abort_reason}
+                        </p>
+                      ) : null}
                     </div>
                     <button className="btn btn-primary btn-md text-xs" onClick={() => toggleExpand(job.id)}>
                       {expandedJobId === job.id ? 'Hide Details' : 'View Details'}
@@ -459,6 +499,11 @@ export default function DriverDashboard() {
                           <p className="text-sm font-semibold text-red-700">
                             ⚠️ This job has been marked as ABORTED.
                           </p>
+                          {job.job_abort_reason ? (
+                            <p className="mt-1 text-sm text-red-700">
+                              <strong>Reason:</strong> {job.job_abort_reason}
+                            </p>
+                          ) : null}
                         </div>
                       ) : (
                         <>
@@ -489,7 +534,7 @@ export default function DriverDashboard() {
 
                           <button
                             className="btn btn-primary btn-md text-xs bg-red-700 hover:bg-red-800 mt-2 ml-2"
-                            onClick={() => abortJob(job.id)}
+                            onClick={() => openAbortJobModal(job)}
                           >
                             Abort Job
                           </button>
@@ -531,6 +576,12 @@ export default function DriverDashboard() {
                       <p className="text-sm text-gray-600">
                         {renderPhoneLink(job.mobile_number || job.telephone_number || job.on_site_contact_number)}
                       </p>
+
+                      {job.job_aborted && job.job_abort_reason ? (
+                        <p className="mt-2 text-sm font-medium text-red-700">
+                          Abort reason: {job.job_abort_reason}
+                        </p>
+                      ) : null}
                     </div>
                     <button className="btn btn-primary btn-md text-xs" onClick={() => toggleExpand(job.id)}>
                       {expandedJobId === job.id ? 'Hide Details' : 'View Details'}
@@ -593,6 +644,12 @@ export default function DriverDashboard() {
                       <p className="text-sm text-gray-600">
                         {renderPhoneLink(job.mobile_number || job.telephone_number || job.on_site_contact_number)}
                       </p>
+
+                      {job.job_aborted && job.job_abort_reason ? (
+                        <p className="mt-2 text-sm font-medium text-red-700">
+                          Abort reason: {job.job_abort_reason}
+                        </p>
+                      ) : null}
                     </div>
 
                     <button
@@ -608,6 +665,44 @@ export default function DriverDashboard() {
           )}
         </div>
       </div>
+
+      {abortJobTarget && (
+        <div className="modal-overlay">
+          <div className="modal-glass max-w-lg">
+            <h2 className="text-xl font-bold text-black mb-2">Abort Job</h2>
+            <p className="text-sm text-gray-600 mb-4">
+              Job {abortJobTarget.id} - {abortJobTarget.job_type || 'Booking'}
+            </p>
+
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Reason for aborting
+            </label>
+            <textarea
+              value={abortReason}
+              onChange={(e) => setAbortReason(e.target.value)}
+              className="w-full p-2 border rounded min-h-[130px]"
+              placeholder="Tell the office why this job could not be completed..."
+            />
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                className="btn btn-neutral btn-md"
+                onClick={closeAbortJobModal}
+                disabled={abortSaving}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn btn-danger btn-md"
+                onClick={abortJob}
+                disabled={abortSaving}
+              >
+                {abortSaving ? 'Saving...' : 'Abort Job'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showWTNModalForJob && (
         <NewWTN

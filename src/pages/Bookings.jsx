@@ -216,6 +216,24 @@ export default function Bookings() {
     if (!error) fetchJobs()
   }
 
+  const updateJobAbortedStatus = async (jobId, isAborted) => {
+    const payload = isAborted
+      ? { job_aborted: true }
+      : {
+          job_aborted: false,
+          job_abort_reason: null,
+          job_aborted_at: null,
+          job_aborted_by: null,
+        }
+
+    const { error } = await supabase
+      .from('jobs')
+      .update(payload)
+      .eq('id', jobId)
+
+    if (!error) fetchJobs()
+  }
+
   const updateJobOrder = async (jobId, order) => {
     const { error } = await supabase
       .from('jobs')
@@ -751,12 +769,17 @@ export default function Bookings() {
                       className="p-1 rounded border"
                       value={job.job_aborted ? 'Yes' : 'No'}
                       onChange={(e) =>
-                        updateJobField(job.id, 'job_aborted', e.target.value === 'Yes')
+                        updateJobAbortedStatus(job.id, e.target.value === 'Yes')
                       }
                     >
                       <option value="No">No</option>
                       <option value="Yes">Yes</option>
                     </select>
+                    {job.job_aborted && job.job_abort_reason ? (
+                      <div className="mt-2 max-w-xs text-xs font-medium text-red-700">
+                        Reason: {job.job_abort_reason}
+                      </div>
+                    ) : null}
                   </td>
 
                   <td className="border px-3 py-2">
@@ -931,7 +954,14 @@ export default function Bookings() {
                       <td className="border px-3 py-2">{job.date_of_service}</td>
                       <td className="border px-3 py-2">{getDriverName(job.driver_id)}</td>
                       <td className="border px-3 py-2">{job.job_complete ? 'Yes' : 'No'}</td>
-                      <td className="border px-3 py-2">{job.job_aborted ? 'Yes' : 'No'}</td>
+                      <td className="border px-3 py-2">
+                        {job.job_aborted ? 'Yes' : 'No'}
+                        {job.job_aborted && job.job_abort_reason ? (
+                          <div className="mt-2 max-w-xs text-xs font-medium text-red-700">
+                            Reason: {job.job_abort_reason}
+                          </div>
+                        ) : null}
+                      </td>
                       <td className="border px-3 py-2">{job.payment_type}</td>
                       <td className="border px-3 py-2">{job.paid ? 'Yes' : 'No'}</td>
 
