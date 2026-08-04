@@ -89,20 +89,37 @@ export default function Bookings() {
   }
 
   const fetchDriverAssignments = async () => {
-    const { data, error } = await supabase
-      .from('job_driver_assignments')
-      .select('job_id, driver_id')
+    const all = []
+    let from = 0
+    const pageSize = 1000
 
-    if (error) {
-      console.warn('Fetch driver assignments failed:', error)
-      setJobDriverAssignments({})
-      return
+    while (true) {
+      const { data, error } = await supabase
+        .from('job_driver_assignments')
+        .select('job_id, driver_id')
+        .order('job_id', { ascending: true })
+        .range(from, from + pageSize - 1)
+
+      if (error) {
+        console.warn('Fetch driver assignments failed:', error)
+        setJobDriverAssignments({})
+        return
+      }
+
+      if (!data || data.length === 0) break
+
+      all.push(...data)
+
+      if (data.length < pageSize) break
+      from += pageSize
     }
 
     const map = {}
-    ;(data || []).forEach((assignment) => {
+    all.forEach((assignment) => {
       if (!map[assignment.job_id]) map[assignment.job_id] = []
-      map[assignment.job_id].push(assignment.driver_id)
+      if (!map[assignment.job_id].includes(assignment.driver_id)) {
+        map[assignment.job_id].push(assignment.driver_id)
+      }
     })
 
     setJobDriverAssignments(map)
