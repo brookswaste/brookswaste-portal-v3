@@ -61,6 +61,7 @@ const VEHICLE_REGISTRATION_OPTIONS = [
   'LE71 LOO',
   'WF61 WVU',
   'EF15 ZBY',
+  'CP61 HZH',
   'Other – ___________________________'
 ];
 
