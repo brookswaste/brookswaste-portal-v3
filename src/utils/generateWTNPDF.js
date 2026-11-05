@@ -351,6 +351,36 @@ export default async function generateWTNPDF(wtn, job = null) {
     }
     y = Math.max(leftY, rightY);
 
+    // --- Waste hierarchy statement ---
+    const hierarchyStatement =
+      "By signing below, the waste transferor and Brooks Waste confirm that they have fulfilled their respective duties to apply the waste hierarchy in accordance with Regulation 12 of the Waste (England and Wales) Regulations 2011.";
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(layout.labelSize);
+    doc.setTextColor(TEXT);
+
+    const hierarchyLines = doc.splitTextToSize(
+      hierarchyStatement,
+      CONTENT_W
+    );
+    const hierarchyLineHeight = 3.8;
+    const hierarchyHeight =
+      hierarchyLines.length * hierarchyLineHeight;
+
+    if (wouldOverflow(6 + hierarchyHeight + 4)) {
+      return { doc, overflow: true };
+    }
+
+    y += 6;
+    hierarchyLines.forEach((textLine, index) => {
+      doc.text(
+        textLine,
+        MARGIN,
+        y + 3 + index * hierarchyLineHeight
+      );
+    });
+    y += hierarchyHeight + 4;
+
     // --- Signatures ---
     sectionHeader("Signatures");
 
