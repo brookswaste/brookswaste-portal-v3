@@ -353,7 +353,7 @@ export default async function generateWTNPDF(wtn, job = null) {
 
     // --- Waste hierarchy statement ---
     const hierarchyStatement =
-      "By signing below, the waste transferor and Brooks Waste confirm that they have fulfilled their respective duties to apply the waste hierarchy in accordance with Regulation 12 of the Waste (England and Wales) Regulations 2011.";
+      "I confirm that I have fulfilled my duty to apply the waste hierarchy as required by the Waste (England and Wales) Regulations 2012";
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(layout.labelSize);
