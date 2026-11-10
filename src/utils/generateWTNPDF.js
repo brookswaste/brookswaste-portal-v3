@@ -10,31 +10,22 @@ export default async function generateWTNPDF(wtn, job = null) {
   // --- Layout variants to try (all 1-page if possible) ---
   const LAYOUTS = [
     {
-      name: "normal",
-      headerSize: 14,
-      labelSize: 8.5,
-      valueSize: 10,
-      sectionGap: 12,
-      lineGap: 3,
-      sigHeight: 18,
-    },
-    {
       name: "compact",
-      headerSize: 13,
-      labelSize: 8,
-      valueSize: 9.2,
-      sectionGap: 10,
-      lineGap: 2.5,
-      sigHeight: 16,
+      headerSize: 12,
+      labelSize: 7.5,
+      valueSize: 8.5,
+      sectionGap: 9,
+      lineGap: 1.8,
+      sigHeight: 14,
     },
     {
-      name: "ultra",
-      headerSize: 12,
-      labelSize: 7.6,
-      valueSize: 8.6,
+      name: "extraCompact",
+      headerSize: 11,
+      labelSize: 7,
+      valueSize: 8,
       sectionGap: 9,
-      lineGap: 2.2,
-      sigHeight: 14,
+      lineGap: 1.4,
+      sigHeight: 12,
     },
   ];
 
@@ -105,14 +96,14 @@ export default async function generateWTNPDF(wtn, job = null) {
 
     const wouldOverflow = (needed = 20) => y + needed > BOTTOM_SAFE;
 
-    const sectionHeader = (title) => {
-      y += 6;
+    const sectionHeader = (title, topGap = 6) => {
+      y += topGap;
       doc.setFillColor(LIGHT_PINK);
       doc.setTextColor("#000000");
       doc.setFont("helvetica", "bold");
       doc.setFontSize(layout.headerSize - 2);
-      doc.rect(MARGIN, y, CONTENT_W, 8, "F");
-      doc.text(title, MARGIN + 3, y + 5.8);
+      doc.rect(MARGIN, y, CONTENT_W, 6, "F");
+      doc.text(title, MARGIN + 3, y + 4.3);
       y += layout.sectionGap;
       doc.setTextColor(TEXT);
     };
@@ -153,10 +144,10 @@ export default async function generateWTNPDF(wtn, job = null) {
       val.forEach((v, i) =>
         doc.text(v, x, yCursor + 3.8 + i * (layout.lineGap + 1.4))
       );
-      yCursor += val.length * (layout.lineGap + 1.4) + 1.5;
+      yCursor += val.length * (layout.lineGap + 1.4) + 0.5;
 
-      line(x, yCursor + 1.1, x + width, yCursor + 1.1);
-      return yCursor + 2.2;
+      line(x, yCursor + 0.8, x + width, yCursor + 0.8);
+      return yCursor + 1.3;
     };
 
     // Convert messy textarea input to clean plain text (fixes spaced letters like "C a l l")
@@ -255,7 +246,7 @@ export default async function generateWTNPDF(wtn, job = null) {
     y += 24;
     
     // --- Job Details ---
-    sectionHeader("Job Details");
+    sectionHeader("Job Details", 2);
 
     let leftY = y;
     let rightY = y;
@@ -295,7 +286,7 @@ export default async function generateWTNPDF(wtn, job = null) {
     y = Math.max(leftY, rightY);
 
     // --- Client Details ---
-    sectionHeader("Client Details");
+    sectionHeader("Client Details", 2);
     leftY = y;
     rightY = y;
 
@@ -325,7 +316,7 @@ export default async function generateWTNPDF(wtn, job = null) {
     y = Math.max(leftY, rightY);
 
     // --- Waste Details ---
-    sectionHeader("Waste Details");
+    sectionHeader("Waste Details", 2);
     leftY = y;
     rightY = y;
 
@@ -367,11 +358,11 @@ export default async function generateWTNPDF(wtn, job = null) {
     const hierarchyHeight =
       hierarchyLines.length * hierarchyLineHeight;
 
-    if (wouldOverflow(6 + hierarchyHeight + 4)) {
+    if (wouldOverflow(2 + hierarchyHeight + 2)) {
       return { doc, overflow: true };
     }
 
-    y += 6;
+    y += 2;
     hierarchyLines.forEach((textLine, index) => {
       doc.text(
         textLine,
@@ -379,7 +370,10 @@ export default async function generateWTNPDF(wtn, job = null) {
         y + 3 + index * hierarchyLineHeight
       );
     });
-    y += hierarchyHeight + 4;
+    y += hierarchyHeight;
+
+    // Reduce the default gap before the signatures heading.
+    y -= 4;
 
     // --- Signatures ---
     sectionHeader("Signatures");
@@ -432,73 +426,161 @@ export default async function generateWTNPDF(wtn, job = null) {
 
     y += SIG_H + 8;
 
-    // --- Additional Comments ---
-    sectionHeader("Additional Comments");
+    // --- Footer: reserve space on every page ---
+    const FOOTER_FONT = 7.1;
+    const FOOTER_LINE_HEIGHT = 3.2;
+    const PAGE_BOTTOM = PAGE_H - MARGIN;
 
-    const commentsText = toPlainText(wtn.additional_comments || "") || "-";
-
-    // Make comments smaller than main values (more text fits)
-    const COMMENTS_FONT = Math.max(7.4, layout.valueSize - 1.8);
-
-    // Line height tied to comment font size
-    const COMMENT_LINE_H = Math.max(3.6, COMMENTS_FONT * 0.45);
-
-    // Set font BEFORE splitting text so splitTextToSize matches rendering
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(COMMENTS_FONT);
-    doc.setTextColor(TEXT);
-    doc.setCharSpace(0);
-
-    // Wrap text to box width
-    const commentLines = doc.splitTextToSize(commentsText, CONTENT_W - 6);
-
-    // Calculate desired box height
-    let desiredBoxHeight = Math.max(
-      layout.sigHeight,
-      commentLines.length * COMMENT_LINE_H + 8
-    );
-
-    // Clamp the box height so it can never exceed remaining page space
-    const MAX_BOX_H = Math.max(18, BOTTOM_SAFE - y - 18);
-    const boxHeight = Math.min(desiredBoxHeight, MAX_BOX_H);
-
-    // If even the clamped box can't fit, force overflow so the compact layout is tried
-    if (wouldOverflow(boxHeight + 6)) return { doc, overflow: true };
-
-    // Draw box
-    doc.setDrawColor(RULE);
-    doc.setLineWidth(0.2);
-    doc.rect(MARGIN, y, CONTENT_W, boxHeight);
-
-    // Draw each line manually, strictly inside the box
-    const textX = MARGIN + 3;
-    let textY = y + 6;
-    const maxTextY = y + boxHeight - 4;
-
-    for (const line of commentLines) {
-      if (textY > maxTextY) break;
-      doc.text(line, textX, textY, { align: "left" });
-      textY += COMMENT_LINE_H;
-    }
-
-    y += boxHeight + 6;
-
-
-    // --- Footer / Terms ---
-    doc.setTextColor(MUTED);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7.1);
+    doc.setFontSize(FOOTER_FONT);
 
     const terms = doc.splitTextToSize(
-      "You are signing to say you have read the above details and that they are correct and the operative has completed the job to a satisfactory standard. " +
-        "Brooks Waste Ltd takes no responsibility for any damage done to your property where access is not suitable for a tanker. " +
         "Please see our full terms and conditions on brookswaste.co.uk - Registered in England 06747484 Registered Office: 4 Chester Court, Chester Hall Lane Basildon, Essex SS14 3WR",
       CONTENT_W
     );
 
-    if (wouldOverflow(terms.length * 3.8 + 10))
+    const footerFirstBaseline =
+      PAGE_BOTTOM - 2 - (terms.length - 1) * FOOTER_LINE_HEIGHT;
+
+    const commentsBottom = footerFirstBaseline - 7;
+
+    const drawFooter = () => {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(FOOTER_FONT);
+      doc.setTextColor(MUTED);
+
+      terms.forEach((textLine, index) => {
+        doc.text(
+          textLine,
+          MARGIN,
+          footerFirstBaseline + index * FOOTER_LINE_HEIGHT
+        );
+      });
+    };
+
+    // Keep signatures and preceding details clear of the footer.
+    // If necessary, retry using the next compact layout.
+    if (y > commentsBottom) {
       return { doc, overflow: true };
-    doc.text(terms, MARGIN, PAGE_H - MARGIN - 8);
+    }
+
+    // --- Additional Comments: continue across pages ---
+    const COMMENTS_FONT = 8;
+    const COMMENT_LINE_HEIGHT = 3.4;
+    const BOX_PADDING_TOP = 6;
+    const BOX_PADDING_BOTTOM = 4;
+    const HEADER_HEIGHT = 6 + layout.sectionGap;
+
+    // Preserve the full comment text, including line breaks.
+    const commentsText =
+      String(wtn.additional_comments ?? "")
+        .replace(/\r\n?/g, "\n")
+        .trim() || "-";
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(COMMENTS_FONT);
+
+    const commentLines = doc.splitTextToSize(
+      commentsText,
+      CONTENT_W - 6
+    );
+
+    const startCommentsPage = () => {
+      drawFooter();
+      doc.addPage();
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.setTextColor(TEXT);
+      doc.text("Brooks Waste – WTN", MARGIN, MARGIN + 5);
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+
+      const reference = String(
+        wtn.customer_job_reference || wtn.job_id || wtn.id || "-"
+      );
+
+      const referenceLines = doc.splitTextToSize(
+        `Reference: ${reference}`,
+        CONTENT_W
+      );
+
+      referenceLines.forEach((textLine, index) => {
+        doc.text(textLine, MARGIN, MARGIN + 11 + index * 4);
+      });
+
+      y = MARGIN + 15 + (referenceLines.length - 1) * 4;
+    };
+
+    let lineIndex = 0;
+
+    while (lineIndex < commentLines.length) {
+      // Leave room for the heading, padding, and one text line.
+      const minimumHeight =
+        HEADER_HEIGHT +
+        BOX_PADDING_TOP +
+        COMMENT_LINE_HEIGHT +
+        BOX_PADDING_BOTTOM;
+
+      if (y + minimumHeight > commentsBottom) {
+        startCommentsPage();
+      }
+
+      sectionHeader(
+        lineIndex === 0
+          ? "Additional Comments"
+          : "Additional Comments (continued)"
+      );
+
+      const availableTextHeight =
+        commentsBottom - y - BOX_PADDING_TOP - BOX_PADDING_BOTTOM;
+
+      const linesThatFit = Math.floor(
+        availableTextHeight / COMMENT_LINE_HEIGHT
+      );
+
+      if (linesThatFit < 1) {
+        // Protect against unusually long reference/header content.
+        return { doc, overflow: true };
+      }
+
+      const pageLines = commentLines.slice(
+        lineIndex,
+        lineIndex + linesThatFit
+      );
+
+      const boxHeight =
+        BOX_PADDING_TOP +
+        pageLines.length * COMMENT_LINE_HEIGHT +
+        BOX_PADDING_BOTTOM;
+
+      doc.setDrawColor(RULE);
+      doc.setLineWidth(0.2);
+      doc.rect(MARGIN, y, CONTENT_W, boxHeight);
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(COMMENTS_FONT);
+      doc.setTextColor(TEXT);
+      doc.setCharSpace(0);
+
+      pageLines.forEach((textLine, index) => {
+        doc.text(
+          textLine,
+          MARGIN + 3,
+          y + BOX_PADDING_TOP + index * COMMENT_LINE_HEIGHT
+        );
+      });
+
+      lineIndex += pageLines.length;
+      y += boxHeight;
+
+      if (lineIndex < commentLines.length) {
+        startCommentsPage();
+      }
+    }
+
+    drawFooter();
 
     return { doc, overflow: false };
   };
@@ -512,10 +594,10 @@ export default async function generateWTNPDF(wtn, job = null) {
       break;
     }
   }
-  if (!finalDoc) {
-    const { doc } = await renderOnce(LAYOUTS[LAYOUTS.length - 1]);
-    finalDoc = doc;
-  }
+ if (!finalDoc) {
+  const { doc } = await renderOnce(LAYOUTS[LAYOUTS.length - 1]);
+  finalDoc = doc;
+}
 
   const safeRef =
     (wtn.customer_job_reference || `Job_${wtn.job_id || "WTN"}`)
